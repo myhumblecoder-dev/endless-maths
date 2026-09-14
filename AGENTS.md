@@ -38,13 +38,17 @@ COPPA.
 ## Before you say you're done
 
 ```bash
+pnpm test
 pnpm lint
 pnpm typecheck
 pnpm build
 ```
 
-All three must pass. `pnpm build` is the one that catches App Router mistakes
-the others miss.
+All four must pass. `pnpm build` catches App Router mistakes the others miss.
+
+`pnpm test` is not optional when touching `src/lib/problems/`. The property
+tests are the only thing standing between a refactor and an app that marks a
+child wrong for being right.
 
 ## Notes for agents
 
@@ -56,3 +60,9 @@ the others miss.
   grading impossible — `Problem.answer` is always a separate typed field.
 - The skill graph (`src/lib/curriculum/skills.ts`) is a DAG. If you add a skill,
   re-check it for cycles and dangling prerequisites.
+- Generators build problems **backwards from the answer** — pick the solution,
+  then construct the problem. Never generate a problem and then solve it.
+- Decimal skills compute in scaled integers and convert once via `dec()`.
+  Float arithmetic gives `0.1 + 0.2 === 0.30000000000000004`.
+- `check()` throws on answer kinds it cannot grade rather than guessing. A
+  wrong `false` marks a child incorrect for a right answer.

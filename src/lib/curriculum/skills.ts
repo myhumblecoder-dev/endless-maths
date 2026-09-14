@@ -11,7 +11,7 @@ import type { Skill, SkillId } from './types'
 export const SKILLS: Skill[] = [
   // ---- number sense -------------------------------------------------------
   { id: 'n-count-20', strand: 'number-sense', kind: 'fact', label: 'Counting to 20', requires: [], answerKind: 'integer', typicalAge: [4, 6] },
-  { id: 'n-compare-20', strand: 'number-sense', kind: 'fact', label: 'Bigger or smaller', requires: ['n-count-20'], answerKind: 'integer', typicalAge: [5, 6] },
+  { id: 'n-compare-20', strand: 'number-sense', kind: 'procedure', label: 'Bigger or smaller', requires: ['n-count-20'], answerKind: 'choice', typicalAge: [5, 6] },
   { id: 'n-bonds-10', strand: 'number-sense', kind: 'fact', label: 'Number bonds to 10', requires: ['n-count-20'], answerKind: 'integer', typicalAge: [5, 7] },
   { id: 'n-place-value-100', strand: 'number-sense', kind: 'procedure', label: 'Tens and ones', requires: ['n-count-20'], answerKind: 'integer', typicalAge: [6, 7] },
   { id: 'n-place-value-1000', strand: 'number-sense', kind: 'procedure', label: 'Hundreds, tens and ones', requires: ['n-place-value-100'], answerKind: 'integer', typicalAge: [7, 8] },
@@ -52,7 +52,7 @@ export const SKILLS: Skill[] = [
   { id: 'f-add-unlike', strand: 'fractions', kind: 'procedure', label: 'Adding fractions, different denominators', requires: ['f-add-like', 'f-equivalent', 'r-factors-multiples'], answerKind: 'fraction', typicalAge: [10, 12] },
   { id: 'f-multiply', strand: 'fractions', kind: 'procedure', label: 'Multiplying fractions', requires: ['f-equivalent'], answerKind: 'fraction', typicalAge: [10, 12] },
   { id: 'f-divide', strand: 'fractions', kind: 'procedure', label: 'Dividing fractions', requires: ['f-multiply'], answerKind: 'fraction', typicalAge: [11, 13] },
-  { id: 'f-decimal-place-value', strand: 'fractions', kind: 'procedure', label: 'Tenths and hundredths', requires: ['n-place-value-1000', 'f-identify'], answerKind: 'decimal', typicalAge: [9, 10] },
+  { id: 'f-decimal-place-value', strand: 'fractions', kind: 'procedure', label: 'Tenths and hundredths', requires: ['n-place-value-1000', 'f-identify'], answerKind: 'integer', typicalAge: [9, 10] },
   { id: 'f-decimal-add-sub', strand: 'fractions', kind: 'procedure', label: 'Adding and subtracting decimals', requires: ['f-decimal-place-value', 'a-add-3digit'], answerKind: 'decimal', typicalAge: [9, 11] },
   { id: 'f-decimal-mult', strand: 'fractions', kind: 'procedure', label: 'Multiplying decimals', requires: ['f-decimal-add-sub', 'm-long-mult'], answerKind: 'decimal', typicalAge: [10, 12] },
   { id: 'f-convert-fdp', strand: 'fractions', kind: 'procedure', label: 'Fractions, decimals and percentages', requires: ['f-decimal-place-value', 'f-equivalent'], answerKind: 'decimal', typicalAge: [10, 12] },
@@ -60,7 +60,7 @@ export const SKILLS: Skill[] = [
 
   // ---- ratio, negatives, order of operations ------------------------------
   { id: 'r-factors-multiples', strand: 'ratio-negatives', kind: 'procedure', label: 'Factors and multiples', requires: ['m-div-6-7-8-9'], answerKind: 'set', typicalAge: [9, 11] },
-  { id: 'r-primes', strand: 'ratio-negatives', kind: 'fact', label: 'Prime numbers', requires: ['r-factors-multiples'], answerKind: 'integer', typicalAge: [10, 11] },
+  { id: 'r-primes', strand: 'ratio-negatives', kind: 'fact', label: 'Prime numbers', requires: ['r-factors-multiples'], answerKind: 'choice', typicalAge: [10, 11] },
   { id: 'r-squares', strand: 'ratio-negatives', kind: 'fact', label: 'Square numbers', requires: ['m-times-6-7-8-9'], answerKind: 'integer', typicalAge: [9, 11] },
   { id: 'r-order-of-ops', strand: 'ratio-negatives', kind: 'procedure', label: 'Order of operations', requires: ['m-2digit-x-1digit', 'a-add-3digit'], answerKind: 'integer', typicalAge: [10, 12] },
   { id: 'r-negative-add-sub', strand: 'ratio-negatives', kind: 'procedure', label: 'Adding and subtracting negatives', requires: ['a-sub-3digit'], answerKind: 'integer', typicalAge: [10, 12] },

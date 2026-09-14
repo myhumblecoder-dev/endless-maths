@@ -198,16 +198,67 @@ Misconceptions (`1/2 + 1/3 = 2/5` — the classic "add across" error) are
 hard-coded per skill from the maths-education literature, not inferred. The top
 five per skill are well documented and beat a model's guess.
 
+## Implementation tiers
+
+The skill graph maps the *domain*. It does not map the *work* — those are
+different shapes, and building in curriculum order gets the order wrong.
+
+What actually determines cost is **which input widget and answer type a skill
+demands**, not where it sits in the curriculum:
+
+| Tier | Needs | Skills | Cost each |
+| --- | --- | --- | --- |
+| 1 | numeric keypad, integer answer, one line of text | 35 | ~15 lines |
+| 1.5 | + a decimal point on the keypad | 4 | near-zero |
+| 2 | fraction type, equivalence, stacked rendering — or multi-part answers | 12 | medium, one-time |
+| 3 | expression canonicalization + expression input, or a new UI paradigm | 4 | large |
+
+**37 of 55 skills need nothing beyond a numeric keypad**, and they span ages
+5–13 — from number bonds to unknowns on both sides of an equation, without ever
+rendering a fraction or parsing an expression.
+
+### Consequence: build the spine, not the ladder
+
+Fractions are the expensive strand and they sit in the *middle* of the
+curriculum. Building bottom-up means hitting the hardest work at 40% done with
+nothing shippable. Build the **spine** instead — arithmetic → negatives → order
+of operations → equations — which is one coherent path, entirely Tier 1, and
+delivers the full counting-to-pre-algebra claim. Fractions then become a
+self-contained investment rather than a blocker.
+
+Two-step equations cost the same to build as two-digit addition: both are a few
+lines, an integer answer, and a keypad. Pre-algebra is not the expensive end of
+this curriculum.
+
+### Return on the three unlocks
+
+| Investment | Unlocks | Verdict |
+| --- | --- | --- |
+| Decimal point on the keypad | 4 skills | free — do it immediately |
+| Fraction type + equivalence + stacked rendering | 9 skills | best return; the one investment worth making |
+| Multi-part answers (remainders, ratios, factor sets) | 3 skills | cheap; do it when a skill needs it |
+| Expression engine + expression input | 3 skills | **worst return in the project** |
+
+The last row is the trap. Canonicalizing expressions so `3 + 5x` matches
+`5x + 3`, plus an input that lets a child type `6x + 15`, is the largest single
+piece of work here and buys exactly three skills: collecting like terms,
+expanding brackets, inequalities. Five of the eight pre-algebra skills are
+Tier 1 already. Defer the expression engine indefinitely and see whether anyone
+misses those three.
+
 ## Build order
 
-1. **Engine + one skill, no AI.** `×2/×5/×10` only, plus the fact scheduler.
+1. ~~**The Tier 1 spine.**~~ Done — 37 generators in `src/lib/problems/`,
+   property-tested. No AI, no network, no server.
 2. **The loop.** One big problem, on-screen keypad, instant feedback, 20-problem
    session, progress bar, `localStorage`.
-3. **Play it with an actual child.** Whether the loop is fun is not something
+3. **The scheduler.** Spaced repetition over facts, trailing success rate over
+   procedures, `findGaps()` for diagnosis.
+4. **Play it with an actual child.** Whether the loop is fun is not something
    that can be reasoned out.
 
-Only then: the full skill graph, then word problems, then hints. If step 2 is
-not fun, no amount of AI rescues it.
+Only then: fractions (Tier 2), then word problems, then hints. If step 4 is not
+fun, no amount of AI rescues it.
 
 ## Open questions
 

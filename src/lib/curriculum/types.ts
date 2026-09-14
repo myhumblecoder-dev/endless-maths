@@ -30,6 +30,7 @@ export type AnswerKind =
   | 'mixed'
   | 'expression'
   | 'set'
+  | 'choice'
 
 export type Answer =
   | { kind: 'integer'; value: number }
@@ -40,6 +41,8 @@ export type Answer =
   | { kind: 'expression'; canonical: string }
   /** Order-independent, e.g. the factor pairs of 24. */
   | { kind: 'set'; values: Answer[] }
+  /** A pick from a small fixed set: `<`/`>`/`=`, yes/no. Needs buttons, not a keypad. */
+  | { kind: 'choice'; value: string; options: string[] }
 
 /**
  * Grading has three outcomes, not two. `6/8` for `3/4` is not wrong — it is
