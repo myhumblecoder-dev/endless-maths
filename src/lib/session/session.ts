@@ -6,10 +6,10 @@
  */
 
 import type { Attempt, Problem, Rng } from '@/lib/curriculum/types'
-import { generate, type ImplementedSkill } from '@/lib/problems'
+import { GENERATORS, generate, type ImplementedSkill } from '@/lib/problems'
 import { check } from '@/lib/problems/check'
 import { record, type Progress } from '@/lib/mastery/mastery'
-import { nextSkill, unlockedSkills } from './scheduler'
+import { nextSkill, unlockedSkills, weakestDueFirst } from './scheduler'
 import { isSkillMastered } from '@/lib/mastery/mastery'
 
 /** Twenty problems, or roughly five minutes. Long enough to matter, short enough to finish. */
@@ -53,9 +53,20 @@ const MIX = { chosen: 0.5, review: 0.3, stretch: 0.2 } as const
  */
 export type SessionOptions = {
   length?: number
-  /** Practise one skill only, as chosen from the skill map. */
+  /** The skill the session is built around, as chosen from the topic map. */
   skill?: ImplementedSkill
+  /**
+   * The clock, for deciding which facts are due. Defaults to now; passed
+   * explicitly by tests so a session is fully determined by its inputs.
+   */
+  now?: number
 }
+
+/** One slot of a session: which skill, and optionally which specific fact. */
+type Slot = { skill: ImplementedSkill; factKey?: string }
+
+/** Attempts to hit a specific fact before settling for any problem in its skill. */
+const TARGET_TRIES = 60
 
 /**
  * The skill each slot of the session draws from.
@@ -69,22 +80,39 @@ function buildPlan(
   progress: Progress,
   focus: ImplementedSkill,
   length: number,
+  now: number,
   rng: Rng,
-): ImplementedSkill[] {
+): Slot[] {
   const unlocked = unlockedSkills(progress).filter((s) => s !== focus)
   const review = unlocked.filter((s) => isSkillMastered(progress, s))
   const stretch = unlocked.filter((s) => !isSkillMastered(progress, s))
 
-  const take = (pool: ImplementedSkill[], n: number): ImplementedSkill[] =>
+  const take = (pool: ImplementedSkill[], n: number): Slot[] =>
     pool.length === 0
-      ? Array.from({ length: n }, () => focus)
-      : Array.from({ length: n }, () => pool[Math.floor(rng() * pool.length)])
+      ? Array.from({ length: n }, () => ({ skill: focus }))
+      : Array.from({ length: n }, () => ({ skill: pool[Math.floor(rng() * pool.length)] }))
 
   const nReview = Math.round(length * MIX.review)
   const nStretch = Math.round(length * MIX.stretch)
-  const plan = [
-    ...Array.from({ length: length - nReview - nStretch }, () => focus),
-    ...take(review, nReview),
+
+  /**
+   * Review slots go to facts that are actually due, weakest first, rather than
+   * a random draw. This is the point of tracking facts at all: a missed 7 x 8
+   * has to come back. Falls through to a random review draw when nothing is
+   * due, and skips facts whose skill has no generator.
+   */
+  const due: Slot[] = weakestDueFirst(progress, now)
+    .flatMap((factKey) => {
+      const skill = progress.facts[factKey].skill
+      // A fact can outlive its generator — skip rather than crash on it.
+      return skill in GENERATORS ? [{ factKey, skill: skill as ImplementedSkill }] : []
+    })
+    .slice(0, nReview)
+
+  const plan: Slot[] = [
+    ...Array.from({ length: length - nReview - nStretch }, () => ({ skill: focus })),
+    ...due,
+    ...take(review, nReview - due.length),
     ...take(stretch, nStretch),
   ]
 
@@ -99,8 +127,8 @@ function buildPlan(
   // so the generation loop's retry cannot fix a run by redrawing — it has to be
   // smoothed here. A run survives only when there is nothing to swap with.
   for (let i = 2; i < plan.length; i++) {
-    if (plan[i] !== plan[i - 1] || plan[i] !== plan[i - 2]) continue
-    const j = plan.findIndex((s, k) => k > i && s !== plan[i])
+    if (plan[i].skill !== plan[i - 1].skill || plan[i].skill !== plan[i - 2].skill) continue
+    const j = plan.findIndex((s, k) => k > i && s.skill !== plan[i].skill)
     if (j !== -1) [plan[i], plan[j]] = [plan[j], plan[i]]
   }
 
@@ -108,8 +136,8 @@ function buildPlan(
 }
 
 export function startSession(progress: Progress, rng: Rng, options: SessionOptions = {}): Session {
-  const { length = SESSION_LENGTH, skill: focus } = options
-  const plan = focus ? buildPlan(progress, focus, length, rng) : null
+  const { length = SESSION_LENGTH, skill: focus, now = Date.now() } = options
+  const plan = focus ? buildPlan(progress, focus, length, now, rng) : null
   const available = unlockedSkills(progress)
   const problems: Problem[] = []
   const asked = new Set<string>()
@@ -122,7 +150,23 @@ export function startSession(progress: Progress, rng: Rng, options: SessionOptio
       return n
     }
 
-    const draw = () => generate(plan ? plan[i] : nextSkill(progress, rng), rng)
+    const slot = plan?.[i]
+
+    /**
+     * Resurfacing a specific fact means drawing until that fact comes up —
+     * generators produce a random problem from their skill, they cannot be
+     * asked for one. A bounded number of attempts, then settle for any problem
+     * from the right skill, which is still useful review.
+     */
+    const draw = () => {
+      if (!slot) return generate(nextSkill(progress, rng), rng)
+      if (!slot.factKey) return generate(slot.skill, rng)
+      for (let t = 0; t < TARGET_TRIES; t++) {
+        const candidate = generate(slot.skill, rng)
+        if (candidate.factKey === slot.factKey) return candidate
+      }
+      return generate(slot.skill, rng)
+    }
 
     let candidate = draw()
 

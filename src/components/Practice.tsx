@@ -72,7 +72,7 @@ export function Practice({ skill, progress, onProgress, onLeave, seed }: Props) 
   useEffect(() => { latestProgress.current = progress })
 
   const begin = useCallback(() => {
-    setSession(startSession(latestProgress.current, seeded(seed ?? Date.now()), { skill }))
+    setSession(startSession(latestProgress.current, seeded(seed ?? Date.now()), { skill, now: Date.now() }))
     setEntry('')
     setFeedback(null)
     shownAt.current = Date.now()
