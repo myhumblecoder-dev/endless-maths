@@ -82,7 +82,7 @@ test('a learner with every prerequisite mastered is not diverted', () => {
 })
 
 test('only skills we can actually generate are suggested', () => {
-  let p = attempts(emptyProgress(), 'f-add-unlike' as SkillId, STRUGGLE_ATTEMPTS, 0)
+  const p = attempts(emptyProgress(), 'f-add-unlike' as SkillId, STRUGGLE_ATTEMPTS, 0)
   const gap = gapBehind(p, 'f-add-unlike' as SkillId)
   // f-identify and r-factors-multiples are unbuilt; never send a learner there.
   assert.ok(gap === undefined || !['f-identify', 'r-factors-multiples'].includes(gap))
