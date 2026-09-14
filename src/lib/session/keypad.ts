@@ -43,3 +43,15 @@ export function canSubmit(entry: Entry): boolean {
   if (/^-?\d*\.?\d*$/.test(entry)) return /\d$/.test(entry)
   return true // choice answers: 'yes', '<', and so on
 }
+
+/**
+ * Does this physical key contribute to the answer?
+ *
+ * Used to spot typing-ahead: a key arriving while feedback is on screen means
+ * the learner has moved on, so the feedback should be skipped rather than the
+ * keystroke swallowed. Swallowing it truncates their next answer — 12 becomes
+ * 2 — and marks a correct answer wrong.
+ */
+export function isEntryKey(key: string): boolean {
+  return /^[0-9]$/.test(key) || key === '-' || key === '.'
+}

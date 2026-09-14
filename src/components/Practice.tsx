@@ -3,15 +3,20 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Keypad } from './Keypad'
 import { SESSION_LENGTH, answer as submitAnswer, currentProblem, isComplete, startSession, summary, type Session } from '@/lib/session/session'
-import { canSubmit as entryCanSubmit, press } from '@/lib/session/keypad'
+import { canSubmit as entryCanSubmit, isEntryKey, press } from '@/lib/session/keypad'
 import { feedbackText, formatAnswer } from '@/lib/problems/format'
 import { seeded } from '@/lib/problems'
 import { SKILL_BY_ID } from '@/lib/curriculum/skills'
 import type { Progress } from '@/lib/mastery/mastery'
 import type { ImplementedSkill } from '@/lib/problems'
 
-/** How long the child sees whether they were right before moving on. */
-const FEEDBACK_MS = 1100
+/**
+ * How long the learner sees the outcome before moving on. A wrong answer needs
+ * longer — there is an answer to read — while "Yes!" is only celebration.
+ * Either way, typing ahead skips it; see `advance`.
+ */
+const FEEDBACK_CORRECT_MS = 700
+const FEEDBACK_WRONG_MS = 1500
 
 type Feedback = { correct: boolean; expected: string }
 
@@ -28,6 +33,30 @@ export function Practice({ skill, progress, onProgress, onLeave }: Props) {
   const [entry, setEntry] = useState('')
   const [feedback, setFeedback] = useState<Feedback | null>(null)
   const shownAt = useRef<number>(0)
+  /** The session as it will be once the current feedback finishes. */
+  const pending = useRef<Session | null>(null)
+  const timer = useRef<number | null>(null)
+
+  /**
+   * Move to the next problem now, cancelling any pending timer. Called both by
+   * the feedback timeout and by typing ahead.
+   */
+  const advance = useCallback(() => {
+    if (timer.current !== null) {
+      window.clearTimeout(timer.current)
+      timer.current = null
+    }
+    const next = pending.current
+    if (!next) return
+    pending.current = null
+    setSession(next)
+    setEntry('')
+    setFeedback(null)
+  }, [])
+
+  useEffect(() => () => {
+    if (timer.current !== null) window.clearTimeout(timer.current)
+  }, [])
 
   // Read through a ref, NOT the prop directly. Answering a question calls
   // onProgress, which changes the `progress` prop, which would otherwise
@@ -61,15 +90,13 @@ export function Practice({ skill, progress, onProgress, onLeave }: Props) {
     const next = submitAnswer(session, given, Date.now() - shownAt.current, Date.now())
     const verdict = next.attempts[next.attempts.length - 1].verdict
 
-    setFeedback({ correct: verdict === 'correct', expected: formatAnswer(problem.answer) })
+    const correct = verdict === 'correct'
+    setFeedback({ correct, expected: formatAnswer(problem.answer) })
     onProgress(next.progress)
 
-    window.setTimeout(() => {
-      setSession(next)
-      setEntry('')
-      setFeedback(null)
-    }, FEEDBACK_MS)
-  }, [session, feedback, onProgress])
+    pending.current = next
+    timer.current = window.setTimeout(advance, correct ? FEEDBACK_CORRECT_MS : FEEDBACK_WRONG_MS)
+  }, [session, feedback, onProgress, advance])
 
   const onKey = useCallback((key: string) => {
     if (feedback) return
@@ -80,15 +107,24 @@ export function Practice({ skill, progress, onProgress, onLeave }: Props) {
   // Physical keyboard, for older children and anyone on a laptop.
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      if (feedback || !problem) return
-      if (/^[0-9]$/.test(e.key)) setEntry((v) => press(v, e.key))
+      // Typing while the outcome is on screen means they have moved on. Skip
+      // the feedback and keep the keystroke — dropping it silently truncates
+      // the next answer, which marks a correct answer wrong.
+      if (feedback) {
+        if (!isEntryKey(e.key)) return
+        advance()
+        setEntry((v) => press(v, e.key))
+        return
+      }
+      if (!problem) return
+
+      if (isEntryKey(e.key)) setEntry((v) => press(v, e.key))
       else if (e.key === 'Backspace') setEntry((v) => press(v, 'back'))
-      else if (e.key === '.' || e.key === '-') setEntry((v) => press(v, e.key))
-      else if (e.key === 'Enter') setEntry((v) => { if (entryCanSubmit(v)) commit(v); return v })
+      else if (e.key === 'Enter' && entryCanSubmit(entry)) commit(entry)
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [feedback, problem, commit])
+  }, [feedback, problem, commit, advance, entry])
 
   const stats = useMemo(() => (session ? summary(session) : null), [session])
 

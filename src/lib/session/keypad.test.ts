@@ -1,6 +1,6 @@
 import { test } from 'vitest'
 import assert from 'node:assert/strict'
-import { press, canSubmit, type Entry } from './keypad'
+import { canSubmit, isEntryKey, press, type Entry } from './keypad'
 
 const blank: Entry = ''
 
@@ -52,4 +52,15 @@ test('canSubmit rejects entries that are not yet a number', () => {
 test('choice answers submit as themselves', () => {
   assert.equal(canSubmit('yes'), true)
   assert.equal(canSubmit('<'), true)
+})
+
+// ---- typing ahead ---------------------------------------------------------
+
+test('digits, minus and decimal point are entry keys', () => {
+  for (const k of ['0', '5', '9', '-', '.']) assert.equal(isEntryKey(k), true, `${k} should be an entry key`)
+})
+
+test('control and navigation keys are not entry keys', () => {
+  for (const k of ['Enter', 'Backspace', 'Shift', 'Tab', 'ArrowLeft', 'a', 'F5'])
+    assert.equal(isEntryKey(k), false, `${k} should not be an entry key`)
 })
