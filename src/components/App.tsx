@@ -40,6 +40,7 @@ export function App() {
         progress={progress}
         onProgress={persist}
         onLeave={() => setSkill(null)}
+        onPickSkill={setSkill}
       />
     )
   }
