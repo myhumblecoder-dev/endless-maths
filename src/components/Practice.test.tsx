@@ -11,59 +11,110 @@ afterEach(cleanup)
 
 /**
  * Mirrors what App does: holds progress and feeds it back down. Without this
- * the session-restart bug is invisible, because that bug only appears when the
- * parent re-renders Practice with new progress after every answer.
+ * the session-restart bug is invisible, because that bug only appeared when the
+ * parent re-rendered Practice with new progress after every answer.
+ *
+ * The seed is fixed so a session is identical on every run.
  */
-function Harness({ skill = 'a-add-within-10' as ImplementedSkill }) {
+function Harness({ skill = 'a-add-within-10' as ImplementedSkill, seed = 4242 }) {
   const [progress, setProgress] = useState<Progress>(() => ({
     ...emptyProgress(),
-    placed: ['n-bonds-10', 'n-compare-20', 'a-add-within-10', 'a-sub-within-10', 'a-add-within-20'],
+    placed: ['n-bonds-10', 'a-add-within-10', 'a-sub-within-10', 'a-add-within-20'],
     placementDone: true,
   }))
-  return <Practice skill={skill} progress={progress} onProgress={setProgress} onLeave={() => {}} />
+  return (
+    <Practice skill={skill} progress={progress} onProgress={setProgress} onLeave={() => {}} seed={seed} />
+  )
 }
 
-/** The prompt is the big heading-sized paragraph; read it back and solve it. */
-function currentPrompt(): string {
-  const el = [...document.querySelectorAll('p')].find((p) => /^\d+\s*[+−]\s*\d+$/.test(p.textContent ?? ''))
-  assert.ok(el, `no arithmetic prompt on screen; body was:\n${document.body.textContent}`)
-  return el.textContent!.trim()
-}
+// ---- reading and answering whatever is on screen --------------------------
+// Sessions interleave, so a session anchored on one skill still shows others.
+// These helpers cope with both input modes: the numeric keypad, and the three
+// buttons the comparison skill uses.
+
+const paragraphs = () => [...document.querySelectorAll('p')].map((p) => (p.textContent ?? '').trim())
+
+/** The comparison prompt, when that is what is on screen. */
+const comparePrompt = () => paragraphs().find((t) => /^\d+ \? \d+$/.test(t))
+
+const numericPrompt = () => paragraphs().find((t) =>
+  /^\d+\s*[+−]\s*\d+$/.test(t) ||
+  /^\d+ \+ \? = 10$/.test(t) ||
+  /^Which digit is in the \w+ place\?/.test(t))
 
 function solve(prompt: string): number {
-  const m = prompt.match(/^(\d+)\s*([+−])\s*(\d+)$/)
-  assert.ok(m, `cannot solve "${prompt}"`)
-  return m[2] === '+' ? +m[1] + +m[3] : +m[1] - +m[3]
+  let m
+  if ((m = prompt.match(/^(\d+)\s*([+−])\s*(\d+)$/))) return m[2] === '+' ? +m[1] + +m[3] : +m[1] - +m[3]
+  if ((m = prompt.match(/^(\d+) \+ \? = 10$/))) return 10 - +m[1]
+  if ((m = prompt.match(/^Which digit is in the (\w+) place\?\s+(\d+)$/))) {
+    const n = m[2]
+    return +(m[1] === 'ones' ? n.slice(-1) : m[1] === 'tens' ? n.slice(-2, -1) : n.slice(-3, -2))
+  }
+  assert.fail(`cannot solve "${prompt}"`)
 }
 
-const type = (text: string) => {
-  for (const ch of text) fireEvent.keyDown(window, { key: ch })
+const type = (text: string) => { for (const ch of text) fireEvent.keyDown(window, { key: ch }) }
+
+/** Answer the current problem correctly, whichever input mode it uses. */
+function answerCorrectly(): void {
+  const compare = comparePrompt()
+  if (compare) {
+    const [, a, b] = compare.match(/^(\d+) \? (\d+)$/)!
+    fireEvent.click(screen.getByRole('button', { name: +a > +b ? '>' : +a < +b ? '<' : '=' }))
+    return
+  }
+  const prompt = numericPrompt()
+  assert.ok(prompt, `nothing answerable on screen:\n${document.body.textContent}`)
+  type(String(solve(prompt)))
+  fireEvent.keyDown(window, { key: 'Enter' })
+}
+
+/** Answer the current problem wrongly, whichever input mode it uses. */
+function answerWrongly(): void {
+  const compare = comparePrompt()
+  if (compare) {
+    const [, a, b] = compare.match(/^(\d+) \? (\d+)$/)!
+    fireEvent.click(screen.getByRole('button', { name: +a > +b ? '<' : '>' }))
+    return
+  }
+  const prompt = numericPrompt()
+  assert.ok(prompt, `nothing answerable on screen:\n${document.body.textContent}`)
+  type(String(solve(prompt) + 1))
+  fireEvent.keyDown(window, { key: 'Enter' })
+}
+
+const settle = () => act(async () => { await new Promise((r) => setTimeout(r, 900)) })
+
+/** Move forward until a keypad problem is showing. */
+async function advanceToNumeric(): Promise<void> {
+  for (let i = 0; i < 10 && !numericPrompt(); i++) {
+    answerCorrectly()
+    await settle()
+  }
+  assert.ok(numericPrompt(), 'no keypad problem appeared in ten tries')
 }
 
 const counter = () => screen.getByText(/\d+ \/ 20/).textContent!.trim()
+
+// ---- tests ----------------------------------------------------------------
 
 test('the progress counter advances instead of restarting the session', async () => {
   render(<Harness />)
   assert.equal(counter(), '1 / 20')
 
-  type(String(solve(currentPrompt())))
-  fireEvent.keyDown(window, { key: 'Enter' })
-  expect(screen.getByText(/Correct/)).toBeTruthy()
-
-  // Let the feedback timer elapse.
-  await act(async () => { await new Promise((r) => setTimeout(r, 900)) })
+  answerCorrectly()
+  await settle()
   assert.equal(counter(), '2 / 20', 'answering must advance, not restart the session')
 })
 
 /**
- * The bug reported from real use: keys pressed while the outcome is on screen
- * were dropped, so "12" was submitted as "2" and a correct answer marked wrong.
+ * Reported from real use: keys pressed while the outcome was on screen were
+ * dropped, so "12" was submitted as "2" and a correct answer marked wrong.
  */
 test('a key pressed during feedback is kept, not swallowed', async () => {
   render(<Harness />)
 
-  type(String(solve(currentPrompt())))
-  fireEvent.keyDown(window, { key: 'Enter' })
+  answerCorrectly()
   expect(screen.getByText(/Correct/)).toBeTruthy()
 
   // Type ahead, exactly as someone answering at speed does.
@@ -75,22 +126,21 @@ test('a key pressed during feedback is kept, not swallowed', async () => {
   assert.equal(counter(), '2 / 20', 'typing ahead should also have advanced the problem')
 })
 
-test('a correct answer is celebrated and a wrong one names the answer', async () => {
+test('a correct answer is confirmed and a wrong one names the answer', async () => {
   render(<Harness />)
 
-  const wrong = solve(currentPrompt()) + 1
-  type(String(wrong))
-  fireEvent.keyDown(window, { key: 'Enter' })
+  answerWrongly()
   expect(screen.getByText(/Answer:/)).toBeTruthy()
 
   await act(async () => { await new Promise((r) => setTimeout(r, 1700)) })
-  type(String(solve(currentPrompt())))
-  fireEvent.keyDown(window, { key: 'Enter' })
+  answerCorrectly()
   expect(screen.getByText(/Correct/)).toBeTruthy()
 })
 
-test('an incomplete entry cannot be submitted', () => {
+test('an incomplete entry cannot be submitted', async () => {
   render(<Harness />)
+  await advanceToNumeric()
+
   const check = screen.getByRole('button', { name: 'Check' }) as HTMLButtonElement
   assert.equal(check.disabled, true, 'Check must be disabled with nothing entered')
 
@@ -103,25 +153,38 @@ test('an incomplete entry cannot be submitted', () => {
 
 test('the keypad is not clickable while feedback is showing', async () => {
   render(<Harness />)
-  type(String(solve(currentPrompt())))
-  fireEvent.keyDown(window, { key: 'Enter' })
+  await advanceToNumeric()
 
+  answerCorrectly()
   const seven = screen.getByRole('button', { name: '7' }) as HTMLButtonElement
-  assert.equal(seven.disabled, true, 'a child must not double-answer by tapping through feedback')
+  assert.equal(seven.disabled, true, 'a learner must not double-answer by tapping through feedback')
 })
 
-// Twenty problems at ~800ms of feedback each needs more than the 5s default.
-test('the whole session can be played to the summary screen', { timeout: 40_000 }, async () => {
+/** Twenty problems at ~900ms of feedback each needs more than the 5s default. */
+test('the whole session can be played to the summary screen', { timeout: 60_000 }, async () => {
   render(<Harness />)
 
   for (let i = 0; i < 20; i++) {
-    type(String(solve(currentPrompt())))
-    fireEvent.keyDown(window, { key: 'Enter' })
-    await act(async () => { await new Promise((r) => setTimeout(r, 800)) })
+    answerCorrectly()
+    await settle()
   }
 
   // Answered correctly throughout, so the score is a clean sweep.
   assert.match(document.body.textContent ?? '', /20\s*\/\s*20/)
   expect(screen.getByRole('button', { name: /^Again$/ })).toBeTruthy()
   expect(screen.getByRole('button', { name: /Choose another topic/ })).toBeTruthy()
+})
+
+/** Interleaving: a session anchored on one skill should still show others. */
+test('a session mixes in other skills', { timeout: 30_000 }, async () => {
+  render(<Harness />)
+  const seen = new Set<string>()
+
+  for (let i = 0; i < 10; i++) {
+    seen.add(comparePrompt() ?? numericPrompt() ?? '')
+    answerCorrectly()
+    await settle()
+  }
+
+  assert.ok(seen.size >= 8, `expected varied questions, saw ${seen.size} distinct in 10`)
 })

@@ -146,13 +146,14 @@ test('variety does not cost reproducibility', () => {
 
 // ---- choosing a skill -----------------------------------------------------
 
-test('a session can be focused on one chosen skill', () => {
-  const placed = { ...emptyProgress(), placed: ['n-bonds-10', 'a-add-within-10'] as const }
-  const s = startSession({ ...emptyProgress(), placed: [...placed.placed] }, seeded(5), {
-    skill: 'a-add-within-20',
-  })
+test('a session is built around the chosen skill', () => {
+  // Superseded by the interleaving tests below: the session is no longer 100%
+  // the chosen skill, but it is still anchored on it.
+  const s = startSession({ ...emptyProgress(), placed: ['n-bonds-10', 'a-add-within-10'] },
+    seeded(5), { skill: 'a-add-within-20' })
   assert.equal(s.problems.length, SESSION_LENGTH)
-  for (const p of s.problems) assert.equal(p.skill, 'a-add-within-20')
+  const chosen = s.problems.filter((p) => p.skill === 'a-add-within-20').length
+  assert.ok(chosen >= SESSION_LENGTH / 2, `chosen skill was only ${chosen} of ${SESSION_LENGTH}`)
 })
 
 test('a focused session still avoids repeating a question', () => {
@@ -163,4 +164,73 @@ test('a focused session still avoids repeating a question', () => {
 
 test('an explicit length is still honoured', () => {
   assert.equal(startSession(emptyProgress(), seeded(3), { length: 5 }).problems.length, 5)
+})
+
+// ---- interleaving ---------------------------------------------------------
+// A session used to be 100% one skill, which is blocked practice — the weaker
+// option per Sparx and the retrieval literature. See docs/research.md.
+
+/** A learner who has mastered a few skills, so there is review to draw on. */
+const experienced = () => ({
+  ...emptyProgress(),
+  placed: ['n-bonds-10', 'n-compare-20', 'n-place-value-100', 'a-add-within-10',
+           'a-sub-within-10', 'a-add-within-20'] as const,
+  placementDone: true,
+})
+
+test('a session interleaves rather than drilling one skill', () => {
+  const s = startSession({ ...emptyProgress(), ...experienced(), placed: [...experienced().placed] },
+    seeded(5), { skill: 'a-sub-within-20' })
+  const skills = new Set(s.problems.map((p) => p.skill))
+  assert.ok(skills.size > 1, 'a session of one skill is blocked practice')
+})
+
+test('the chosen skill is always the largest share', () => {
+  for (const seed of [1, 2, 3, 11, 42]) {
+    const s = startSession({ ...experienced(), placed: [...experienced().placed] },
+      seeded(seed), { skill: 'a-sub-within-20' })
+    const counts = new Map<string, number>()
+    for (const p of s.problems) counts.set(p.skill, (counts.get(p.skill) ?? 0) + 1)
+    const chosen = counts.get('a-sub-within-20') ?? 0
+    for (const [skill, n] of counts) {
+      if (skill !== 'a-sub-within-20') {
+        assert.ok(chosen > n, `seed ${seed}: ${skill} (${n}) beat the chosen skill (${chosen})`)
+      }
+    }
+  }
+})
+
+test('roughly half the session is the chosen skill', () => {
+  for (const seed of [1, 7, 20]) {
+    const s = startSession({ ...experienced(), placed: [...experienced().placed] },
+      seeded(seed), { skill: 'a-sub-within-20' })
+    const chosen = s.problems.filter((p) => p.skill === 'a-sub-within-20').length
+    assert.ok(chosen >= 8 && chosen <= 14, `seed ${seed}: chosen skill took ${chosen} of 20`)
+  }
+})
+
+test('a learner with nothing mastered still gets a full session', () => {
+  // Nothing to review, so it degrades to the chosen skill rather than falling short.
+  const s = startSession(emptyProgress(), seeded(3), { skill: 'n-bonds-10' })
+  assert.equal(s.problems.length, SESSION_LENGTH)
+})
+
+test('interleaving does not break the existing variety rules', () => {
+  for (const seed of [1, 5, 9, 30]) {
+    const s = startSession({ ...experienced(), placed: [...experienced().placed] },
+      seeded(seed), { skill: 'a-sub-within-20' })
+    const prompts = s.problems.map((p) => p.prompt)
+    assert.equal(new Set(prompts).size, prompts.length, `seed ${seed} repeated a question`)
+    const skills = s.problems.map((p) => p.skill)
+    for (let i = 2; i < skills.length; i++) {
+      assert.ok(!(skills[i] === skills[i - 1] && skills[i] === skills[i - 2]),
+        `seed ${seed}: three ${skills[i]} in a row`)
+    }
+  }
+})
+
+test('interleaving stays reproducible from its seed', () => {
+  const run = () => startSession({ ...experienced(), placed: [...experienced().placed] },
+    seeded(77), { skill: 'a-sub-within-20' }).problems.map((p) => `${p.skill}:${p.prompt}`)
+  assert.deepEqual(run(), run())
 })

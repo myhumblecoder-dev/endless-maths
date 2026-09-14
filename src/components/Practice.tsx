@@ -25,9 +25,15 @@ type Props = {
   progress: Progress
   onProgress: (progress: Progress) => void
   onLeave: () => void
+  /**
+   * Fix the session seed. Omitted in the app (the clock supplies it), set in
+   * tests — and the hook a "replay this session" feature would use, since the
+   * same seed reproduces the same twenty problems.
+   */
+  seed?: number
 }
 
-export function Practice({ skill, progress, onProgress, onLeave }: Props) {
+export function Practice({ skill, progress, onProgress, onLeave, seed }: Props) {
   // Session seeding uses the clock, so the first render must be server-safe.
   const [session, setSession] = useState<Session | null>(null)
   const [entry, setEntry] = useState('')
@@ -66,11 +72,11 @@ export function Practice({ skill, progress, onProgress, onLeave }: Props) {
   useEffect(() => { latestProgress.current = progress })
 
   const begin = useCallback(() => {
-    setSession(startSession(latestProgress.current, seeded(Date.now()), { skill }))
+    setSession(startSession(latestProgress.current, seeded(seed ?? Date.now()), { skill }))
     setEntry('')
     setFeedback(null)
     shownAt.current = Date.now()
-  }, [skill])
+  }, [skill, seed])
 
   // Deferred init: the session seed is `Date.now()`, so it cannot exist during
   // server rendering. Runs on mount and whenever a different skill is chosen.
