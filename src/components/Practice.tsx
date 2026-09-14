@@ -7,6 +7,7 @@ import { canSubmit as entryCanSubmit, isEntryKey, press } from '@/lib/session/ke
 import { feedbackText, formatAnswer } from '@/lib/problems/format'
 import { seeded } from '@/lib/problems'
 import { SKILL_BY_ID } from '@/lib/curriculum/skills'
+import { gapBehind } from '@/lib/session/diagnose'
 import type { Progress } from '@/lib/mastery/mastery'
 import type { ImplementedSkill } from '@/lib/problems'
 
@@ -25,6 +26,8 @@ type Props = {
   progress: Progress
   onProgress: (progress: Progress) => void
   onLeave: () => void
+  /** Jump straight to another skill — used by the gap suggestion. */
+  onPickSkill?: (skill: ImplementedSkill) => void
   /**
    * Fix the session seed. Omitted in the app (the clock supplies it), set in
    * tests — and the hook a "replay this session" feature would use, since the
@@ -33,7 +36,7 @@ type Props = {
   seed?: number
 }
 
-export function Practice({ skill, progress, onProgress, onLeave, seed }: Props) {
+export function Practice({ skill, progress, onProgress, onLeave, onPickSkill, seed }: Props) {
   // Session seeding uses the clock, so the first render must be server-safe.
   const [session, setSession] = useState<Session | null>(null)
   const [entry, setEntry] = useState('')
@@ -147,6 +150,15 @@ export function Practice({ skill, progress, onProgress, onLeave, seed }: Props) 
 
   const label = SKILL_BY_ID.get(skill)?.label ?? ''
 
+  /**
+   * Repeatedly failing a skill usually means something underneath it is
+   * missing. Offered at the end rather than mid-session — interrupting someone
+   * who is already struggling is the wrong moment — and only offered, never
+   * forced.
+   */
+  const gap = isComplete(session) ? gapBehind(session.progress, skill) : undefined
+  const gapLabel = gap ? SKILL_BY_ID.get(gap)?.label : undefined
+
   if (isComplete(session)) {
     return (
       <main className="mx-auto grid min-h-dvh max-w-md place-items-center p-6 text-center">
@@ -160,6 +172,23 @@ export function Practice({ skill, progress, onProgress, onLeave, seed }: Props) 
               {(median / 1000).toFixed(1)}s per question
             </p>
           )}
+          {gap && gapLabel && onPickSkill && (
+            <div className="mt-8 rounded-2xl bg-sky-50 p-4 text-left dark:bg-sky-950/40">
+              <p className="text-sm text-slate-600 dark:text-slate-300">
+                This one leans on <strong>{gapLabel}</strong>. Practising that first usually makes
+                it click.
+              </p>
+              <button
+                type="button"
+                onClick={() => onPickSkill(gap)}
+                className="mt-3 h-12 w-full rounded-xl bg-sky-600 text-base font-semibold text-white
+                           transition active:scale-95 hover:bg-sky-700"
+              >
+                Practise {gapLabel}
+              </button>
+            </div>
+          )}
+
           <div className="mt-8 space-y-3">
             <button
               type="button"

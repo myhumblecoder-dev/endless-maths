@@ -4,7 +4,7 @@ import assert from 'node:assert/strict'
 import { useState } from 'react'
 import { render, screen, fireEvent, cleanup, act } from '@testing-library/react'
 import { Practice } from './Practice'
-import { emptyProgress, type Progress } from '@/lib/mastery/mastery'
+import { emptyProgress, record, type Progress } from '@/lib/mastery/mastery'
 import type { ImplementedSkill } from '@/lib/problems'
 
 afterEach(cleanup)
@@ -187,4 +187,63 @@ test('a session mixes in other skills', { timeout: 30_000 }, async () => {
   }
 
   assert.ok(seen.size >= 8, `expected varied questions, saw ${seen.size} distinct in 10`)
+})
+
+// ---- suggesting the real gap ---------------------------------------------
+
+/** Someone placed high who has been getting two-step equations wrong. */
+function strugglingProgress(): Progress {
+  let p: Progress = {
+    ...emptyProgress(),
+    placed: ['n-bonds-10', 'n-compare-20', 'n-place-value-100', 'n-place-value-1000', 'n-round',
+      'a-add-within-10', 'a-sub-within-10', 'a-add-within-20', 'a-sub-within-20',
+      'a-add-2digit', 'a-add-2digit-regroup', 'a-sub-2digit', 'a-sub-2digit-regroup',
+      'a-add-3digit', 'a-sub-3digit', 'm-times-2-5-10', 'm-times-3-4', 'm-times-6-7-8-9',
+      'm-2digit-x-1digit', 'r-order-of-ops', 'p-evaluate', 'p-solve-one-step'],
+    placementDone: true,
+  }
+  for (let i = 0; i < 8; i++) {
+    p = record(p, {
+      problemId: `p-solve-two-step#${i}`, skill: 'p-solve-two-step',
+      given: '0', verdict: 'incorrect', elapsedMs: 9000, at: i,
+    })
+  }
+  return p
+}
+
+function StruggleHarness({ onPick = () => {} }: { onPick?: (s: ImplementedSkill) => void }) {
+  const [progress, setProgress] = useState<Progress>(strugglingProgress)
+  return (
+    <Practice skill="p-solve-two-step" progress={progress} onProgress={setProgress}
+      onLeave={() => {}} onPickSkill={onPick} seed={99} />
+  )
+}
+
+test('the summary offers the gap underneath a skill being failed', { timeout: 60_000 }, async () => {
+  render(<StruggleHarness />)
+
+  // Play the session out, getting everything wrong.
+  for (let i = 0; i < 20; i++) {
+    type('0')
+    fireEvent.keyDown(window, { key: 'Enter' })
+    await act(async () => { await new Promise((r) => setTimeout(r, 1600)) })
+  }
+
+  // "Adding and subtracting negatives" is two levels below two-step equations.
+  assert.match(document.body.textContent ?? '', /negatives/i,
+    'a learner failing this needs the gap beneath it, not more of the same')
+})
+
+test('the suggestion can be declined', { timeout: 60_000 }, async () => {
+  const picked: string[] = []
+  render(<StruggleHarness onPick={(s) => picked.push(s)} />)
+
+  for (let i = 0; i < 20; i++) {
+    type('0')
+    fireEvent.keyDown(window, { key: 'Enter' })
+    await act(async () => { await new Promise((r) => setTimeout(r, 1600)) })
+  }
+
+  assert.equal(picked.length, 0, 'nothing should be forced on them')
+  expect(screen.getByRole('button', { name: /^Again$/ })).toBeTruthy()
 })
