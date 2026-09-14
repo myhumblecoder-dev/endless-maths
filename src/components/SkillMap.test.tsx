@@ -48,7 +48,7 @@ test('placement can be retaken, behind a deliberate second tap', () => {
   fireEvent.click(screen.getByRole('button', { name: /Change my level/i }))
   assert.equal(onRetake.mock.calls.length, 0, 'one tap must not wipe a level by accident')
 
-  fireEvent.click(screen.getByRole('button', { name: /Yes, start the questions again/i }))
+  fireEvent.click(screen.getByRole('button', { name: /Yes, retake it/i }))
   assert.equal(onRetake.mock.calls.length, 1)
 })
 
@@ -57,7 +57,7 @@ test('the confirmation can be backed out of', () => {
   render(<SkillMap progress={placed()} onPick={() => {}} onRetakePlacement={onRetake} />)
 
   fireEvent.click(screen.getByRole('button', { name: /Change my level/i }))
-  fireEvent.click(screen.getByRole('button', { name: /No, keep going/i }))
+  fireEvent.click(screen.getByRole('button', { name: /Cancel/i }))
   assert.equal(onRetake.mock.calls.length, 0)
   expect(screen.getByRole('button', { name: /Change my level/i })).toBeTruthy()
 })

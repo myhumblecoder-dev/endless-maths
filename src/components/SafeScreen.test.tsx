@@ -26,7 +26,7 @@ test('a healthy screen renders its children untouched', () => {
  */
 test('a crash becomes a friendly screen, not a blank page', () => {
   render(<SafeScreen><Boom /></SafeScreen>)
-  assert.match(document.body.textContent ?? '', /Oops/i)
+  assert.match(document.body.textContent ?? '', /Something went wrong/i)
   expect(screen.getByRole('button', { name: /Start again/i })).toBeTruthy()
 })
 

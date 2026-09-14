@@ -267,12 +267,12 @@ this curriculum.
 | Multi-part answers (remainders, ratios, factor sets) | 3 skills | cheap; do it when a skill needs it |
 | Expression engine + expression input | 3 skills | **worst return in the project** |
 
-The last row is the trap. Canonicalizing expressions so `3 + 5x` matches
-`5x + 3`, plus an input that lets a child type `6x + 15`, is the largest single
-piece of work here and buys exactly three skills: collecting like terms,
-expanding brackets, inequalities. Five of the eight pre-algebra skills are
-Tier 1 already. Defer the expression engine indefinitely and see whether anyone
-misses those three.
+~~The last row is the trap.~~ **Superseded — see `research.md`.** That
+reasoning assumed we would write the expression input and the canonicaliser
+ourselves. MathLive supplies both (MIT, `<math-field>`, MathJSON output), so the
+cost collapses. And for a 13-year-old, collecting like terms and expanding
+brackets are not a rounding error — they are the curriculum. Tier 3 is now worth
+building.
 
 ## Build order
 
@@ -320,8 +320,12 @@ Placement is what moves a learner across the map, not tapping through locks.
 
 ## Open questions
 
-- Does unsimplified (`6/8` for `3/4`) count as correct, prompt a retry, or score
-  partial? Affects `Verdict` handling throughout.
+See `research.md` — prior art has since settled two of these and reversed two
+decisions recorded above (the expression engine's cost, and blocked practice).
+
+- ~~Does unsimplified (`6/8` for `3/4`) count as correct?~~ Settled: it is
+  `equivalent-unsimplified`, told to the learner, never scored wrong. Khan
+  Academy's inconsistency here is a long-standing complaint.
 - Placement is a single snapshot. A child who has a bad day is placed low and
   has no way back up except grinding. Does it need re-sitting, or should
   sustained accuracy auto-promote?

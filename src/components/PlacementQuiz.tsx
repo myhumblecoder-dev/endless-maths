@@ -49,7 +49,7 @@ export function PlacementQuiz({ onDone }: { onDone: (progress: Progress) => void
     <main className="mx-auto flex min-h-dvh max-w-md flex-col gap-6 p-5">
       <div>
         <p className="text-sm text-slate-500 dark:text-slate-400">
-          Let&apos;s find out what you already know
+          Quick check to find your level
         </p>
         <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
           <div
@@ -58,7 +58,7 @@ export function PlacementQuiz({ onDone }: { onDone: (progress: Progress) => void
           />
         </div>
         <p className="mt-2 text-xs text-slate-400 dark:text-slate-500">
-          Some of these will be too hard — skip them by guessing, that&apos;s fine.
+          Some will be beyond you. Skip those — it won&apos;t count against you.
         </p>
       </div>
 
@@ -89,7 +89,7 @@ export function PlacementQuiz({ onDone }: { onDone: (progress: Progress) => void
           className="h-12 w-full rounded-2xl text-lg font-semibold text-slate-400 transition
                      hover:bg-slate-100 dark:text-slate-500 dark:hover:bg-slate-800"
         >
-          I don&apos;t know this one
+          Skip
         </button>
       </div>
     </main>

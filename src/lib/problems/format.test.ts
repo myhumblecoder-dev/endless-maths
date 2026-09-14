@@ -21,12 +21,14 @@ test('choices show as written', () => {
 
 // ---- feedback -------------------------------------------------------------
 
-test('being right is celebrated', () => {
-  assert.equal(feedbackText(true, '8'), '✓ Yes!')
+// Pitched for 11-13s. Retrieval practice works best when it "feels like
+// practice, not constant judgement", so the wording stays flat and factual —
+// no exclamation, no praise, no commiseration.
+test('a correct answer is confirmed without fuss', () => {
+  assert.equal(feedbackText(true, '8'), 'Correct')
 })
 
-test('being wrong names the answer instead of showing a bare number', () => {
-  // A lone "8" tells a five-year-old nothing about what the 8 is.
-  assert.equal(feedbackText(false, '8'), "It's 8")
-  assert.equal(feedbackText(false, '−23'), "It's −23")
+test('a wrong answer labels the answer rather than showing a bare number', () => {
+  assert.equal(feedbackText(false, '8'), 'Answer: 8')
+  assert.equal(feedbackText(false, '−23'), 'Answer: −23')
 })

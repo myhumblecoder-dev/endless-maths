@@ -42,16 +42,15 @@ export class SafeScreen extends Component<{ children: ReactNode }, { crashed: bo
     return (
       <main className="mx-auto grid min-h-dvh max-w-md place-items-center p-6 text-center">
         <div>
-          <p className="text-7xl" aria-hidden>🤔</p>
-          <h1 className="mt-4 text-3xl font-bold text-slate-900 dark:text-slate-50">Oops!</h1>
-          <p className="mt-2 text-xl text-slate-600 dark:text-slate-300">
-            Something went wrong. That&apos;s not your fault.
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-50">Something went wrong</h1>
+          <p className="mt-2 text-base text-slate-600 dark:text-slate-300">
+            Not your fault. Starting again will reset your saved progress.
           </p>
           <button
             type="button"
             onClick={this.startAgain}
-            className="mt-8 h-16 w-full rounded-2xl bg-emerald-500 text-2xl font-bold text-white
-                       transition active:scale-95 hover:bg-emerald-600"
+            className="mt-8 h-14 w-full rounded-2xl bg-emerald-600 text-lg font-semibold text-white
+                       transition active:scale-95 hover:bg-emerald-700"
           >
             Start again
           </button>

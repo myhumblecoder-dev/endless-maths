@@ -48,7 +48,7 @@ test('the progress counter advances instead of restarting the session', async ()
 
   type(String(solve(currentPrompt())))
   fireEvent.keyDown(window, { key: 'Enter' })
-  expect(screen.getByText(/Yes!/)).toBeTruthy()
+  expect(screen.getByText(/Correct/)).toBeTruthy()
 
   // Let the feedback timer elapse.
   await act(async () => { await new Promise((r) => setTimeout(r, 900)) })
@@ -64,13 +64,13 @@ test('a key pressed during feedback is kept, not swallowed', async () => {
 
   type(String(solve(currentPrompt())))
   fireEvent.keyDown(window, { key: 'Enter' })
-  expect(screen.getByText(/Yes!/)).toBeTruthy()
+  expect(screen.getByText(/Correct/)).toBeTruthy()
 
   // Type ahead, exactly as someone answering at speed does.
   fireEvent.keyDown(window, { key: '1' })
   fireEvent.keyDown(window, { key: '2' })
 
-  expect(screen.queryByText(/Yes!/)).toBeNull()
+  expect(screen.queryByText(/Correct/)).toBeNull()
   expect(screen.getByText('12')).toBeTruthy()
   assert.equal(counter(), '2 / 20', 'typing ahead should also have advanced the problem')
 })
@@ -81,12 +81,12 @@ test('a correct answer is celebrated and a wrong one names the answer', async ()
   const wrong = solve(currentPrompt()) + 1
   type(String(wrong))
   fireEvent.keyDown(window, { key: 'Enter' })
-  expect(screen.getByText(/It's/)).toBeTruthy()
+  expect(screen.getByText(/Answer:/)).toBeTruthy()
 
   await act(async () => { await new Promise((r) => setTimeout(r, 1700)) })
   type(String(solve(currentPrompt())))
   fireEvent.keyDown(window, { key: 'Enter' })
-  expect(screen.getByText(/Yes!/)).toBeTruthy()
+  expect(screen.getByText(/Correct/)).toBeTruthy()
 })
 
 test('an incomplete entry cannot be submitted', () => {
@@ -120,8 +120,8 @@ test('the whole session can be played to the summary screen', { timeout: 40_000 
     await act(async () => { await new Promise((r) => setTimeout(r, 800)) })
   }
 
-  expect(screen.getByText(/All done/)).toBeTruthy()
   // Answered correctly throughout, so the score is a clean sweep.
-  assert.match(document.body.textContent ?? '', /You got\s*20\s*out of\s*20/)
-  expect(screen.getByRole('button', { name: /Go again/ })).toBeTruthy()
+  assert.match(document.body.textContent ?? '', /20\s*\/\s*20/)
+  expect(screen.getByRole('button', { name: /^Again$/ })).toBeTruthy()
+  expect(screen.getByRole('button', { name: /Choose another topic/ })).toBeTruthy()
 })

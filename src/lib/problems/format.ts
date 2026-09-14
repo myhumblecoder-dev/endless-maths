@@ -17,11 +17,14 @@ export function formatAnswer(answer: Answer): string {
 }
 
 /**
- * What the child sees after answering.
+ * What the learner sees after answering.
  *
- * A wrong answer names the number rather than showing it bare — a lone "8"
- * where the child expected their own entry reads as confusing, not corrective.
+ * Flat and factual. The audience is 11-13, and the retrieval-practice research
+ * is clear that frequent low-stakes testing should feel like practice rather
+ * than constant judgement — so no praise, no commiseration, no exclamation.
+ * A wrong answer labels the number, because a bare "8" sitting where their own
+ * entry was reads as confusing rather than corrective.
  */
 export function feedbackText(correct: boolean, expected: string): string {
-  return correct ? '✓ Yes!' : `It's ${expected}`
+  return correct ? 'Correct' : `Answer: ${expected}`
 }

@@ -128,27 +128,40 @@ export function Practice({ skill, progress, onProgress, onLeave }: Props) {
 
   const stats = useMemo(() => (session ? summary(session) : null), [session])
 
+  /** Median, not mean — one interruption should not skew the whole session. */
+  const median = useMemo(() => {
+    if (!session || session.attempts.length === 0) return null
+    const times = session.attempts.map((a) => a.elapsedMs).sort((a, b) => a - b)
+    return times[Math.floor(times.length / 2)]
+  }, [session])
+
   if (!session || !stats) {
     return <main className="grid min-h-dvh place-items-center text-slate-400">Loading…</main>
   }
 
+  const label = SKILL_BY_ID.get(skill)?.label ?? ''
+
   if (isComplete(session)) {
     return (
       <main className="mx-auto grid min-h-dvh max-w-md place-items-center p-6 text-center">
-        <div>
-          <p className="text-7xl">{stats.correct === stats.total ? '🏆' : '⭐'}</p>
-          <h1 className="mt-4 text-3xl font-bold text-slate-900 dark:text-slate-50">All done!</h1>
-          <p className="mt-2 text-xl text-slate-600 dark:text-slate-300">
-            You got <strong>{stats.correct}</strong> out of <strong>{stats.total}</strong>
+        <div className="w-full">
+          <p className="text-6xl font-bold tabular-nums text-slate-900 dark:text-slate-50">
+            {stats.correct}<span className="text-slate-400 dark:text-slate-500">/{stats.total}</span>
           </p>
+          <h1 className="mt-3 text-xl font-semibold text-slate-600 dark:text-slate-300">{label}</h1>
+          {median !== null && (
+            <p className="mt-1 text-sm text-slate-400 dark:text-slate-500">
+              {(median / 1000).toFixed(1)}s per question
+            </p>
+          )}
           <div className="mt-8 space-y-3">
             <button
               type="button"
               onClick={begin}
-              className="h-16 w-full rounded-2xl bg-emerald-500 text-2xl font-bold text-white
-                         transition active:scale-95 hover:bg-emerald-600"
+              className="h-14 w-full rounded-2xl bg-emerald-600 text-lg font-semibold text-white
+                         transition active:scale-95 hover:bg-emerald-700"
             >
-              Go again
+              Again
             </button>
             <button
               type="button"
@@ -156,7 +169,7 @@ export function Practice({ skill, progress, onProgress, onLeave }: Props) {
               className="h-14 w-full rounded-2xl text-lg font-semibold text-slate-500
                          transition hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
             >
-              Pick something else
+              Choose another topic
             </button>
           </div>
         </div>
@@ -165,8 +178,6 @@ export function Practice({ skill, progress, onProgress, onLeave }: Props) {
   }
 
   if (!problem) return null
-
-  const label = SKILL_BY_ID.get(problem.skill)?.label ?? ''
 
   return (
     <main className="mx-auto flex min-h-dvh max-w-md flex-col gap-6 p-5">
@@ -201,8 +212,8 @@ export function Practice({ skill, progress, onProgress, onLeave }: Props) {
           className={`grid h-20 place-items-center rounded-2xl text-4xl font-bold transition-colors ${
             feedback
               ? feedback.correct
-                ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300'
-                : 'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300'
+                ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400'
+                : 'bg-amber-50 text-amber-800 dark:bg-amber-950/50 dark:text-amber-400'
               : 'bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-slate-50'
           }`}
         >

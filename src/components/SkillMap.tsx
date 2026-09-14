@@ -37,7 +37,7 @@ export function SkillMap({
 
   return (
     <main className="mx-auto min-h-dvh max-w-md p-5">
-      <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-50">What shall we practise?</h1>
+      <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-50">Topics</h1>
 
       <div className="mt-6 space-y-7">
         {strands.map((strand) => {
@@ -94,7 +94,7 @@ export function SkillMap({
         {confirming ? (
           <div className="space-y-2">
             <p className="text-sm text-slate-500 dark:text-slate-400">
-              You&apos;ll answer the starting questions again.
+              You&apos;ll retake the level check.
             </p>
             <button
               type="button"
@@ -102,7 +102,7 @@ export function SkillMap({
               className="h-12 w-full rounded-2xl bg-sky-500 text-lg font-semibold text-white
                          transition active:scale-95 hover:bg-sky-600"
             >
-              Yes, start the questions again
+              Yes, retake it
             </button>
             <button
               type="button"
@@ -110,7 +110,7 @@ export function SkillMap({
               className="h-12 w-full rounded-2xl text-lg font-semibold text-slate-500
                          transition hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
             >
-              No, keep going
+              Cancel
             </button>
           </div>
         ) : (
