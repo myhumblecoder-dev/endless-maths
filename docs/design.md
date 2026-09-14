@@ -276,24 +276,55 @@ misses those three.
 
 ## Build order
 
-1. ~~**The Tier 1 spine.**~~ Done — 37 generators in `src/lib/problems/`,
-   property-tested. No AI, no network, no server.
-2. **The loop.** One big problem, on-screen keypad, instant feedback, 20-problem
-   session, progress bar, `localStorage`.
-3. **The scheduler.** Spaced repetition over facts, trailing success rate over
-   procedures, `findGaps()` for diagnosis.
+1. ~~**The Tier 1 spine.**~~ Done — 37 generators in `src/lib/problems/`.
+2. ~~**The loop.**~~ Done — one problem at a time, keypad, instant feedback,
+   bounded session, `localStorage`.
+3. ~~**Placement and the skill map.**~~ Done — see above.
 4. **Play it with an actual child.** Whether the loop is fun is not something
    that can be reasoned out.
 
 Only then: fractions (Tier 2), then word problems, then hints. If step 4 is not
 fun, no amount of AI rescues it.
 
+Known gaps: the fact scheduler exists (`dueFacts`) but nothing consumes it yet —
+a focused session draws from its skill without consulting spaced repetition.
+`findGaps()` is likewise built and unused.
+
+## Placement
+
+The skill graph is a wall without it: every learner starts at number bonds and
+must grind three infant skills before anything else unlocks. A ten-year-old
+would quit before reaching times tables.
+
+**A one-time quiz across every strand, then hard locks.** Per strand it probes
+easiest → hardest → binary search:
+
+- the easiest-first short-circuit means a struggling child leaves a strand after
+  one question rather than sitting through a run of failures
+- the hardest-second short-circuit means a confident learner clears a whole
+  strand in two
+
+Measured: **6 questions** for a beginner, **9** for a ten-year-old (placing out
+of 24 skills, straight to long division), **12** for an adult. An
+"I don't know this one" button means nobody has to guess wildly, and the quiz
+deliberately shows no right/wrong — it is a placement, not a test.
+
+`Progress.placed` records it, kept apart from `Progress.skills` because being
+placed out of something is not the same as having practised it, and only
+practice yields fact-level fluency data. `placementDone` is separate again: a
+genuine beginner places out of nothing and must not be handed the quiz forever.
+
+**Locks are hard.** The map shows every skill, but locked ones are not
+selectable — seeing what is coming motivates, faceplanting into it does not.
+Placement is what moves a learner across the map, not tapping through locks.
+
 ## Open questions
 
 - Does unsimplified (`6/8` for `3/4`) count as correct, prompt a retry, or score
   partial? Affects `Verdict` handling throughout.
-- How does a child pick a starting point without a placement test that feels
-  like an exam?
+- Placement is a single snapshot. A child who has a bad day is placed low and
+  has no way back up except grinding. Does it need re-sitting, or should
+  sustained accuracy auto-promote?
 - Sound and animation — motivating for this age group, but a hard accessibility
   and classroom-use constraint.
 - One child per device, or a lightweight local profile switcher for siblings and

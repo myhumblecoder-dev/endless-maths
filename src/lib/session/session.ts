@@ -6,7 +6,7 @@
  */
 
 import type { Attempt, Problem, Rng } from '@/lib/curriculum/types'
-import { generate } from '@/lib/problems'
+import { generate, type ImplementedSkill } from '@/lib/problems'
 import { check } from '@/lib/problems/check'
 import { record, type Progress } from '@/lib/mastery/mastery'
 import { nextSkill, unlockedSkills } from './scheduler'
@@ -40,8 +40,17 @@ const MAX_RUN = 2
  * questions, so a long enough session must be allowed to repeat instead of
  * hanging.
  */
-export function startSession(progress: Progress, rng: Rng, length = SESSION_LENGTH): Session {
-  const available = unlockedSkills(progress)
+export type SessionOptions = {
+  length?: number
+  /** Practise one skill only, as chosen from the skill map. */
+  skill?: ImplementedSkill
+}
+
+export function startSession(progress: Progress, rng: Rng, options: SessionOptions = {}): Session {
+  const { length = SESSION_LENGTH, skill: focus } = options
+  // A focused session is all one skill by definition, so the run limit cannot
+  // apply — only the no-repeated-question rule does.
+  const available = focus ? [focus] : unlockedSkills(progress)
   const problems: Problem[] = []
   const asked = new Set<string>()
 
@@ -53,13 +62,15 @@ export function startSession(progress: Progress, rng: Rng, length = SESSION_LENG
       return n
     }
 
-    let candidate = generate(nextSkill(progress, rng), rng)
+    const draw = () => generate(focus ?? nextSkill(progress, rng), rng)
+
+    let candidate = draw()
 
     for (let attempt = 0; attempt < VARIETY_TRIES; attempt++) {
       const stale = asked.has(candidate.prompt)
       const overrun = available.length > 1 && runLength(candidate.skill) >= MAX_RUN
       if (!stale && !overrun) break
-      candidate = generate(nextSkill(progress, rng), rng)
+      candidate = draw()
     }
 
     asked.add(candidate.prompt)

@@ -7,32 +7,44 @@ import { canSubmit as entryCanSubmit, press } from '@/lib/session/keypad'
 import { feedbackText, formatAnswer } from '@/lib/problems/format'
 import { seeded } from '@/lib/problems'
 import { SKILL_BY_ID } from '@/lib/curriculum/skills'
-import { browserStore, loadProgress, saveProgress } from '@/lib/mastery/storage'
+import type { Progress } from '@/lib/mastery/mastery'
+import type { ImplementedSkill } from '@/lib/problems'
 
 /** How long the child sees whether they were right before moving on. */
 const FEEDBACK_MS = 1100
 
 type Feedback = { correct: boolean; expected: string }
 
-export function Practice() {
-  // Progress lives in localStorage, so the first render must be server-safe.
+type Props = {
+  skill: ImplementedSkill
+  progress: Progress
+  onProgress: (progress: Progress) => void
+  onLeave: () => void
+}
+
+export function Practice({ skill, progress, onProgress, onLeave }: Props) {
+  // Session seeding uses the clock, so the first render must be server-safe.
   const [session, setSession] = useState<Session | null>(null)
   const [entry, setEntry] = useState('')
   const [feedback, setFeedback] = useState<Feedback | null>(null)
   const shownAt = useRef<number>(0)
 
+  // Read through a ref, NOT the prop directly. Answering a question calls
+  // onProgress, which changes the `progress` prop, which would otherwise
+  // invalidate `begin` and re-run the effect below — restarting the session
+  // from problem 1 after every single answer.
+  const latestProgress = useRef(progress)
+  useEffect(() => { latestProgress.current = progress })
+
   const begin = useCallback(() => {
-    const progress = loadProgress(browserStore())
-    setSession(startSession(progress, seeded(Date.now())))
+    setSession(startSession(latestProgress.current, seeded(Date.now()), { skill }))
     setEntry('')
     setFeedback(null)
     shownAt.current = Date.now()
-  }, [])
+  }, [skill])
 
-  // Deliberate deferred init. The session seed is `Date.now()` and progress
-  // comes from localStorage, so neither exists during server rendering —
-  // building the session on mount is what keeps hydration consistent.
-  // eslint-disable-next-line react-hooks/set-state-in-effect
+  // Deferred init: the session seed is `Date.now()`, so it cannot exist during
+  // server rendering. Runs on mount and whenever a different skill is chosen.
   useEffect(() => { begin() }, [begin])
 
   const problem = session ? currentProblem(session) : undefined
@@ -50,14 +62,14 @@ export function Practice() {
     const verdict = next.attempts[next.attempts.length - 1].verdict
 
     setFeedback({ correct: verdict === 'correct', expected: formatAnswer(problem.answer) })
-    saveProgress(browserStore(), next.progress)
+    onProgress(next.progress)
 
     window.setTimeout(() => {
       setSession(next)
       setEntry('')
       setFeedback(null)
     }, FEEDBACK_MS)
-  }, [session, feedback])
+  }, [session, feedback, onProgress])
 
   const onKey = useCallback((key: string) => {
     if (feedback) return
@@ -93,14 +105,24 @@ export function Practice() {
           <p className="mt-2 text-xl text-slate-600 dark:text-slate-300">
             You got <strong>{stats.correct}</strong> out of <strong>{stats.total}</strong>
           </p>
-          <button
-            type="button"
-            onClick={begin}
-            className="mt-8 h-16 w-full rounded-2xl bg-emerald-500 text-2xl font-bold text-white
-                       transition active:scale-95 hover:bg-emerald-600"
-          >
-            Go again
-          </button>
+          <div className="mt-8 space-y-3">
+            <button
+              type="button"
+              onClick={begin}
+              className="h-16 w-full rounded-2xl bg-emerald-500 text-2xl font-bold text-white
+                         transition active:scale-95 hover:bg-emerald-600"
+            >
+              Go again
+            </button>
+            <button
+              type="button"
+              onClick={onLeave}
+              className="h-14 w-full rounded-2xl text-lg font-semibold text-slate-500
+                         transition hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
+            >
+              Pick something else
+            </button>
+          </div>
         </div>
       </main>
     )
@@ -114,8 +136,15 @@ export function Practice() {
     <main className="mx-auto flex min-h-dvh max-w-md flex-col gap-6 p-5">
       {/* A visible finish line: the supply is endless, this session is not. */}
       <div>
-        <div className="flex justify-between text-sm text-slate-500 dark:text-slate-400">
-          <span>{label}</span>
+        <div className="flex items-center justify-between text-sm text-slate-500 dark:text-slate-400">
+          <button
+            type="button"
+            onClick={onLeave}
+            className="-ml-1 rounded px-1 hover:text-slate-900 dark:hover:text-slate-100"
+            aria-label="Back to the skill list"
+          >
+            ← {label}
+          </button>
           <span>{session.index + 1} / {SESSION_LENGTH}</span>
         </div>
         <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">

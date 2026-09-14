@@ -23,6 +23,13 @@ function isProgress(v: unknown): v is Progress {
   return plainObject(facts) && plainObject(skills)
 }
 
+/** `placed` arrived after v1 shipped; treat a record without it as unplaced. */
+const normalise = (p: Progress): Progress => ({
+  ...p,
+  placed: Array.isArray(p.placed) ? p.placed : [],
+  placementDone: p.placementDone === true,
+})
+
 /**
  * Never throws. A mangled record costs the child their history, which is
  * recoverable; a thrown error mid-session costs them the app, which is not.
@@ -32,7 +39,7 @@ export function loadProgress(store: KeyValueStore): Progress {
     const raw = store.getItem(STORAGE_KEY)
     if (!raw) return emptyProgress()
     const parsed: unknown = JSON.parse(raw)
-    return isProgress(parsed) ? parsed : emptyProgress()
+    return isProgress(parsed) ? normalise(parsed) : emptyProgress()
   } catch {
     return emptyProgress()
   }

@@ -34,9 +34,22 @@ export const PROCEDURE_MASTERY_RATE = 0.85
 export type Progress = {
   facts: Record<string, FactState>
   skills: Partial<Record<SkillId, SkillState>>
+  /**
+   * Skills the placement quiz established are already known. Kept apart from
+   * `skills` because being placed out of something is not the same as having
+   * practised it — and only practice produces the fact-level fluency data.
+   */
+  placed: SkillId[]
+  /**
+   * Distinct from `placed` being empty — a genuine beginner places out of
+   * nothing, and must not be handed the quiz again every time they open the app.
+   */
+  placementDone: boolean
 }
 
-export const emptyProgress = (): Progress => ({ facts: {}, skills: {} })
+export const emptyProgress = (): Progress => ({
+  facts: {}, skills: {}, placed: [], placementDone: false,
+})
 
 const push = <T>(xs: T[], x: T, max: number): T[] => [...xs, x].slice(-max)
 
@@ -68,7 +81,7 @@ export function record(progress: Progress, attempt: Attempt): Progress {
     }
   }
 
-  return { facts, skills }
+  return { ...progress, facts, skills }
 }
 
 export function factMedianMs(state: FactState): number {
@@ -90,6 +103,7 @@ export function skillCorrectRate(progress: Progress, skill: SkillId): number {
 
 /** Accuracy over a trailing window. Deliberately says nothing about speed. */
 export function isSkillMastered(progress: Progress, skill: SkillId): boolean {
+  if (progress.placed.includes(skill)) return true
   const s = progress.skills[skill]
   if (!s || s.attempts < MIN_PROCEDURE_ATTEMPTS) return false
   return skillCorrectRate(progress, skill) >= PROCEDURE_MASTERY_RATE

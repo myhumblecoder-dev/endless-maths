@@ -134,7 +134,7 @@ test('a session does not run the same skill more than twice in a row', () => {
 test('a session still fills up when the available pool is small', () => {
   // n-bonds-10 has only nine possible questions; asking for sixty problems
   // must degrade to repeats rather than hang or throw.
-  const s = startSession(emptyProgress(), seeded(3), 60)
+  const s = startSession(emptyProgress(), seeded(3), { length: 60 })
   assert.equal(s.problems.length, 60)
 })
 
@@ -142,4 +142,25 @@ test('variety does not cost reproducibility', () => {
   const a = startSession(emptyProgress(), seeded(11)).problems.map((p) => p.prompt)
   const b = startSession(emptyProgress(), seeded(11)).problems.map((p) => p.prompt)
   assert.deepEqual(a, b)
+})
+
+// ---- choosing a skill -----------------------------------------------------
+
+test('a session can be focused on one chosen skill', () => {
+  const placed = { ...emptyProgress(), placed: ['n-bonds-10', 'a-add-within-10'] as const }
+  const s = startSession({ ...emptyProgress(), placed: [...placed.placed] }, seeded(5), {
+    skill: 'a-add-within-20',
+  })
+  assert.equal(s.problems.length, SESSION_LENGTH)
+  for (const p of s.problems) assert.equal(p.skill, 'a-add-within-20')
+})
+
+test('a focused session still avoids repeating a question', () => {
+  const s = startSession(emptyProgress(), seeded(9), { skill: 'n-place-value-100' })
+  const prompts = s.problems.map((p) => p.prompt)
+  assert.equal(new Set(prompts).size, prompts.length)
+})
+
+test('an explicit length is still honoured', () => {
+  assert.equal(startSession(emptyProgress(), seeded(3), { length: 5 }).problems.length, 5)
 })
