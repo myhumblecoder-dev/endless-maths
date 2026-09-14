@@ -35,6 +35,20 @@ COPPA.
 - `src/types/` — shared types.
 - Keep secrets server-only. Anything named `NEXT_PUBLIC_*` ships to the browser.
 
+## Branching
+
+GitFlow. `develop` is the default branch and gets every change first; `main` is
+releases only and auto-deploys to **production**, which children are using.
+
+Branch off `develop`, open a pull request back into `develop`, never commit
+straight to either long-lived branch. Full flow in `CONTRIBUTING.md`.
+
+```bash
+git switch develop && git pull
+git switch -c feat/42-short-description
+gh pr create --base develop --body "Closes #42"
+```
+
 ## Before you say you're done
 
 ```bash
@@ -44,7 +58,7 @@ pnpm typecheck
 pnpm build
 ```
 
-All four must pass. `pnpm build` catches App Router mistakes the others miss.
+All four must pass; CI runs the same four. `pnpm build` catches App Router mistakes the others miss.
 
 `pnpm test` is not optional when touching `src/lib/problems/`. The property
 tests are the only thing standing between a refactor and an app that marks a
@@ -52,7 +66,11 @@ child wrong for being right.
 
 ## Notes for agents
 
-- Don't add a dependency without saying why in the PR/commit body.
+- Work test-first: red, green, refactor. Code arriving without a test is
+  removed in the refactor step, not retro-fitted with one.
+- Don't add a dependency without saying why in the PR/commit body. Measure the
+  bundle cost before adopting anything large — see the MathLive spike in
+  `docs/research.md` for why.
 - Don't commit `.env.local`. Add new vars to `.env.example` (name + comment,
   never a real value) and to the README's env table.
 - The POC's domain model is worth reading for intent, not for structure. Note
