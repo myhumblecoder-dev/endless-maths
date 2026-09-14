@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { SKILLS } from '@/lib/curriculum/skills'
 import { GENERATORS, type ImplementedSkill } from '@/lib/problems'
 import { isSkillMastered, type Progress } from '@/lib/mastery/mastery'
-import { unlockedSkills } from '@/lib/session/scheduler'
+import { unlockedSkills, weakestDueFirst } from '@/lib/session/scheduler'
 import type { Strand } from '@/lib/curriculum/types'
 
 const STRAND_LABEL: Record<Strand, string> = {
@@ -26,18 +26,39 @@ export function SkillMap({
   progress,
   onPick,
   onRetakePlacement,
+  now,
 }: {
   progress: Progress
   onPick: (skill: ImplementedSkill) => void
   onRetakePlacement: () => void
+  /**
+   * The clock, for working out what is due. Passed in rather than read here —
+   * calling Date.now() during render is impure and makes the component
+   * re-render to different output for the same props.
+   */
+  now: number
 }) {
   const unlocked = new Set(unlockedSkills(progress))
   const strands = Object.keys(STRAND_LABEL) as Strand[]
   const [confirming, setConfirming] = useState(false)
 
+  /**
+   * How many facts are waiting per skill. Shown so a learner can see where the
+   * review in their next session will come from, rather than being surprised
+   * by it mid-practice.
+   */
+  const dueCount = new Map<string, number>()
+  for (const factKey of weakestDueFirst(progress, now)) {
+    const s = progress.facts[factKey].skill
+    dueCount.set(s, (dueCount.get(s) ?? 0) + 1)
+  }
+
   return (
     <main className="mx-auto min-h-dvh max-w-md p-5">
       <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-50">Topics</h1>
+      <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+        Every session is mostly the topic you pick, mixed with review of things you have done before.
+      </p>
 
       <div className="mt-6 space-y-7">
         {strands.map((strand) => {
@@ -70,7 +91,14 @@ export function SkillMap({
                           {done ? '✓' : open ? '●' : '○'}
                         </span>
                         <span className="flex-1">{skill.label}</span>
-                        {done && <span className="text-sm text-emerald-600 dark:text-emerald-400">done</span>}
+                        {open && (dueCount.get(skill.id) ?? 0) > 0 && (
+                          <span className="text-sm text-sky-600 dark:text-sky-400">
+                            {dueCount.get(skill.id)} to review
+                          </span>
+                        )}
+                        {done && (dueCount.get(skill.id) ?? 0) === 0 && (
+                          <span className="text-sm text-emerald-600 dark:text-emerald-400">done</span>
+                        )}
                       </button>
                     </li>
                   )
