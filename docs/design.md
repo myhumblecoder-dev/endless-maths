@@ -163,6 +163,27 @@ Six strands, ~50 skills: number sense → addition/subtraction →
 multiplication/division → fractions/decimals/percentages → ratio, negatives and
 order of operations → pre-algebra. Defined in `src/lib/curriculum/skills.ts`.
 
+## Simplifying is part of the skill
+
+`3/4` is the answer. `6/8` is the right value in the wrong form, and putting it
+in lowest terms is itself a thing worth practising — so it is neither accepted
+silently nor marked wrong.
+
+`equivalent-unsimplified` is its own outcome with its own response: tell the
+learner the value is right and invite them to simplify, then let them answer
+again. Only the simplified form completes the problem.
+
+Two things this must never become:
+
+- **Marking it wrong.** It is not wrong, and telling a child it is teaches them
+  to distrust their own correct reasoning.
+- **Silently accepting it.** That is the [Khan Academy
+  inconsistency](research.md) — students there meet both behaviours inside one
+  lesson and cannot tell which applies.
+
+The rule holds everywhere it could apply: fractions, and simplified ratios
+(`2 : 3`, not `4 : 6`). It lives in one place so it cannot drift.
+
 ## Deployment shape
 
 One Next.js package, deployed to Vercel as a single unit. **Not a monorepo** —
@@ -323,9 +344,8 @@ Placement is what moves a learner across the map, not tapping through locks.
 See `research.md` — prior art has since settled two of these and reversed two
 decisions recorded above (the expression engine's cost, and blocked practice).
 
-- ~~Does unsimplified (`6/8` for `3/4`) count as correct?~~ Settled: it is
-  `equivalent-unsimplified`, told to the learner, never scored wrong. Khan
-  Academy's inconsistency here is a long-standing complaint.
+- ~~Does unsimplified (`6/8` for `3/4`) count as correct?~~ **Settled — see
+  "Simplifying is part of the skill" below.**
 - Placement is a single snapshot. A child who has a bad day is placed low and
   has no way back up except grinding. Does it need re-sitting, or should
   sustained accuracy auto-promote?

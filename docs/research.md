@@ -29,13 +29,44 @@ Alternatives considered and rejected:
 > brackets, inequalities) are squarely Year 8–9 material for a 13-year-old, so
 > the cost fell and the value rose at the same time.
 
-Open questions before adopting: bundle size (it is not small), and whether the
-web component survives Next.js SSR — it will almost certainly need a
-client-only dynamic import.
+**Spiked September 2026 — and the conclusion reversed again. See below.**
 
 **Not** needed for fractions. A two-box numerator/denominator input is simpler,
-faster to tap, and unambiguous. Reach for MathLive only where a free-form
-expression is genuinely the answer.
+faster to tap, and unambiguous.
+
+### Spike result: don't adopt it
+
+Built a throwaway page against MathLive 0.110.0 and measured it.
+
+**What worked.** Rendering is excellent, the `<math-field>` element behaves, and
+a client-only dynamic import keeps it off the critical path — the 795 KB chunk
+appeared in *neither* route's initial HTML. 222 KB gzipped, lazily loaded.
+
+**What killed it.** `getValue('math-json')` returns
+`["Error", "compute-engine-not-available"]`. MathJSON needs a **separate**
+package, `@cortex-js/compute-engine`, which MathLive does not bundle — and
+canonical comparison was the entire reason to adopt MathLive:
+
+| | gzipped |
+| --- | --- |
+| mathlive | 222 KB |
+| compute-engine `core.js` | **859 KB** |
+| compute-engine chunk | **645 KB** |
+| fonts + sounds (runtime fetch) | 536 KB raw |
+
+Roughly 1.5 MB gzipped of computer-algebra system, to grade three skills.
+
+**What to do instead.** The answers these skills need are not arbitrary maths —
+they are linear expressions in one variable: `7x + 5`, `6x + 15`, `x > 5`. That
+needs an extended keypad (digits, `x`, `+`, `−`, and the relations) and a small
+normaliser of our own, not a CAS. Perhaps a hundred lines, fully testable,
+entirely under our control, and no dependency at all.
+
+The original tier analysis called the expression engine expensive because we
+would write the canonicaliser ourselves. Then MathLive appeared to remove that
+cost. The spike shows it does not — but the honest answer is that the
+canonicaliser was never the hard part, because the grammar is tiny. Writing it
+is cheaper than either alternative.
 
 ## Accepting unsimplified answers is a real differentiator
 
