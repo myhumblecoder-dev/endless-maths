@@ -107,3 +107,39 @@ test('elapsed time is carried through to the attempt', () => {
   const s = answerCorrectly(start(), 2500)
   assert.equal(s.attempts[0].elapsedMs, 2500)
 })
+
+// ---- variety --------------------------------------------------------------
+// Uniform random over the unlocked skills produced six number bonds in a row
+// and the same question twice. Both read as "this app is broken".
+
+test('a session does not ask the same question twice', () => {
+  for (const seed of [1234, 7, 99, 20260914]) {
+    const prompts = startSession(emptyProgress(), seeded(seed)).problems.map((p) => p.prompt)
+    assert.equal(new Set(prompts).size, prompts.length, `seed ${seed} repeated a question`)
+  }
+})
+
+test('a session does not run the same skill more than twice in a row', () => {
+  for (const seed of [1234, 7, 99, 20260914]) {
+    const skills = startSession(emptyProgress(), seeded(seed)).problems.map((p) => p.skill)
+    for (let i = 2; i < skills.length; i++) {
+      assert.ok(
+        !(skills[i] === skills[i - 1] && skills[i] === skills[i - 2]),
+        `seed ${seed}: three ${skills[i]} in a row at ${i + 1}`,
+      )
+    }
+  }
+})
+
+test('a session still fills up when the available pool is small', () => {
+  // n-bonds-10 has only nine possible questions; asking for sixty problems
+  // must degrade to repeats rather than hang or throw.
+  const s = startSession(emptyProgress(), seeded(3), 60)
+  assert.equal(s.problems.length, 60)
+})
+
+test('variety does not cost reproducibility', () => {
+  const a = startSession(emptyProgress(), seeded(11)).problems.map((p) => p.prompt)
+  const b = startSession(emptyProgress(), seeded(11)).problems.map((p) => p.prompt)
+  assert.deepEqual(a, b)
+})
