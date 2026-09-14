@@ -1,5 +1,10 @@
 import { App } from '@/components/App'
+import { SafeScreen } from '@/components/SafeScreen'
 
 export default function Home() {
-  return <App />
+  return (
+    <SafeScreen>
+      <App />
+    </SafeScreen>
+  )
 }

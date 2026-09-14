@@ -44,5 +44,11 @@ export function App() {
     )
   }
 
-  return <SkillMap progress={progress} onPick={setSkill} />
+  return (
+    <SkillMap
+      progress={progress}
+      onPick={setSkill}
+      onRetakePlacement={() => persist({ ...progress, placed: [], placementDone: false })}
+    />
+  )
 }
