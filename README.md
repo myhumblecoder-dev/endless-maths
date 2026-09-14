@@ -83,12 +83,12 @@ Hosted on Vercel, project `myhumblecoders-projects/endless-maths` (linked via
 `.vercel/`, which is gitignored). Env vars are managed in the Vercel dashboard,
 not in the repo — add there first, then `pnpm dlx vercel env pull .env.local`.
 
-**Git auto-deploy is not connected yet.** `vercel git connect` fails because the
-Vercel GitHub App is not installed on the `myhumblecoder-dev` org — the only app
-installed there is `humblecoder-dev-automation`. Until someone with org owner
-rights installs it and grants access to this repo, `main` → production and PR
-previews will not fire — **pushing to `main` deploys nothing**. Deploy manually
-in the meantime:
+`main` → production; every PR gets a preview deployment. This runs through the
+Vercel GitHub App installed on the `myhumblecoder-dev` org — if auto-deploy ever
+stops firing, check that installation still has access to this repo before
+debugging anything else.
+
+To deploy by hand:
 
 ```bash
 pnpm dlx vercel deploy          # preview
