@@ -80,6 +80,8 @@ export type Problem = {
 /** Spaced-repetition state for one fact. Lives in localStorage, never sent anywhere. */
 export type FactState = {
   factKey: string
+  /** Which skill produces this fact — the route from "due" back to a problem. */
+  skill: SkillId
   /** Leitner box; higher = longer interval. A wrong answer resets it to 0. */
   box: number
   seen: number
