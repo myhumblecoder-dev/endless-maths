@@ -3,8 +3,12 @@ name: CI
 on:
   pull_request:
     branches: [develop, main]
+  # Only main on push. develop is long-lived with a standing PR into main, so
+  # triggering on pushes to it ran every commit twice — once for the push and
+  # once for that PR. Work reaching develop has already been checked by the PR
+  # that merged it; this leaves main verified after each release.
   push:
-    branches: [develop, main]
+    branches: [main]
 
 # A new push to a branch makes the in-flight run pointless.
 concurrency:
