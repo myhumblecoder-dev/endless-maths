@@ -1,9 +1,50 @@
-<!-- BEGIN:nextjs-agent-rules -->
+# AGENTS.md
 
-# This is NOT the Next.js you know
+Working notes for AI coding agents (and humans) in this repo.
 
-This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+## What this is
 
-This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+`endless-maths` is the web app for **endlessmath.org** — an endless, personalized
+maths practice generator. A learner picks an operation (addition, subtraction,
+multiplication, division) and gets a never-ending stream of problems, with
+generative AI shaping difficulty and phrasing to the individual.
 
-<!-- END:nextjs-agent-rules -->
+It supersedes the .NET 6 proof of concept in `../POC_EndlessMath.API`, which
+proved the generative-AI integration but is not the production path.
+
+## Stack
+
+- Next.js (App Router) + TypeScript, `src/` layout, `@/*` import alias
+- Tailwind CSS v4
+- pnpm (pinned via `packageManager` in `package.json`; Node pinned in `.nvmrc`)
+- Deployed on Vercel
+
+## Conventions
+
+- `src/app/` — routes, layouts, route handlers. Server Components by default;
+  add `"use client"` only where interactivity actually requires it.
+- `src/components/` — shared UI.
+- `src/lib/` — data access, external clients, pure logic. Problem generation
+  and any model calls belong here, never inline in a component.
+- `src/types/` — shared types.
+- Keep secrets server-only. Anything named `NEXT_PUBLIC_*` ships to the browser.
+
+## Before you say you're done
+
+```bash
+pnpm lint
+pnpm typecheck
+pnpm build
+```
+
+All three must pass. `pnpm build` is the one that catches App Router mistakes
+the others miss.
+
+## Notes for agents
+
+- Don't add a dependency without saying why in the PR/commit body.
+- Don't commit `.env.local`. Add new vars to `.env.example` (name + comment,
+  never a real value) and to the README's env table.
+- The POC's domain model is worth reading for intent, not for structure:
+  `OperationType` enum, a query carrying the operation, a response carrying a
+  list of equations.
