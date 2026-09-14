@@ -4,7 +4,7 @@ An endless, personalized maths practice generator — pick an operation, get a
 never-ending stream of problems tuned to you. Built for learners who need volume
 and for the people teaching them.
 
-**Production:** not yet deployed — see [Deployment](#deployment)
+**Production:** https://endless-maths-seven.vercel.app
 **Repo:** https://github.com/myhumblecoder-dev/endless-maths
 
 ## Requirements
@@ -87,7 +87,8 @@ not in the repo — add there first, then `pnpm dlx vercel env pull .env.local`.
 Vercel GitHub App is not installed on the `myhumblecoder-dev` org — the only app
 installed there is `humblecoder-dev-automation`. Until someone with org owner
 rights installs it and grants access to this repo, `main` → production and PR
-previews will not fire. Deploy manually in the meantime:
+previews will not fire — **pushing to `main` deploys nothing**. Deploy manually
+in the meantime:
 
 ```bash
 pnpm dlx vercel deploy          # preview
@@ -105,9 +106,11 @@ pnpm dlx vercel deploy --prod   # production
 - **Answer checking is unsolved.** The POC returned equations with answers
   included (`1 + 1 = 2`). Problems and answers need to be separate fields before
   anything can be graded.
-- **Production URL is unclaimed.** Nothing has been deployed, so the eventual
-  `*.vercel.app` domain is not yet known. Fill in the Production link above after
-  the first deploy.
+- **The domain is `endless-maths-seven`, not `endless-maths`.**
+  `endless-maths.vercel.app` is taken by an unrelated project, so Vercel assigned
+  the suffixed name. Claim a real domain before this is shared with anyone.
+- **Production currently serves the stock Next.js starter page.** The first
+  deploy existed to claim the domain, not to ship anything.
 - Reference POC: `../POC_EndlessMath.API` — read `Services/GenAiService.cs` and
   `Enums/OperationType.cs` for intent.
 
