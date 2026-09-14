@@ -75,7 +75,8 @@ src/types/        shared types
 | `pnpm dev` | Local dev server |
 | `pnpm build` | Production build (run before pushing) |
 | `pnpm lint` | ESLint |
-| `pnpm typecheck` | `tsc --noEmit` |
+| `pnpm typecheck` | `next typegen` then `tsc --noEmit` |
+| `pnpm test` | property, typed-path, soak and component suites |
 
 ## Deployment
 
@@ -83,10 +84,14 @@ Hosted on Vercel, project `myhumblecoders-projects/endless-maths` (linked via
 `.vercel/`, which is gitignored). Env vars are managed in the Vercel dashboard,
 not in the repo — add there first, then `pnpm dlx vercel env pull .env.local`.
 
-`main` → production; every PR gets a preview deployment. This runs through the
-Vercel GitHub App installed on the `myhumblecoder-dev` org — if auto-deploy ever
-stops firing, check that installation still has access to this repo before
-debugging anything else.
+GitFlow: **`develop`** is the default branch and gets preview deployments;
+**`main`** is releases only and deploys to production. Vercel's production
+branch is pinned to `main` explicitly, so changing the GitHub default did not
+move it. See `CONTRIBUTING.md`.
+
+Auto-deploy runs through the Vercel GitHub App installed on the
+`myhumblecoder-dev` org — if it ever stops firing, check that installation still
+has access to this repo before debugging anything else.
 
 To deploy by hand:
 
