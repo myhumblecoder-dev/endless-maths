@@ -10,7 +10,13 @@ multiplication, division) and gets a never-ending stream of problems, with
 generative AI shaping difficulty and phrasing to the individual.
 
 It supersedes the .NET 6 proof of concept in `../POC_EndlessMath.API`, which
-proved the generative-AI integration but is not the production path.
+is not the production path.
+
+**Read `docs/design.md` before making design decisions.** The short version: the
+maths engine is deterministic and runs client-side; the model is a language
+layer (word problems, hints) and never generates arithmetic. Mastery state stays
+in `localStorage` because the users are children and server-side data means
+COPPA.
 
 ## Stack
 
@@ -45,6 +51,8 @@ the others miss.
 - Don't add a dependency without saying why in the PR/commit body.
 - Don't commit `.env.local`. Add new vars to `.env.example` (name + comment,
   never a real value) and to the README's env table.
-- The POC's domain model is worth reading for intent, not for structure:
-  `OperationType` enum, a query carrying the operation, a response carrying a
-  list of equations.
+- The POC's domain model is worth reading for intent, not for structure. Note
+  it fused problem and answer into one string (`"1 + 1 = 2"`), which makes
+  grading impossible — `Problem.answer` is always a separate typed field.
+- The skill graph (`src/lib/curriculum/skills.ts`) is a DAG. If you add a skill,
+  re-check it for cycles and dangling prerequisites.
