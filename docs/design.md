@@ -163,6 +163,34 @@ Six strands, ~50 skills: number sense → addition/subtraction →
 multiplication/division → fractions/decimals/percentages → ratio, negatives and
 order of operations → pre-algebra. Defined in `src/lib/curriculum/skills.ts`.
 
+## Deployment shape
+
+One Next.js package, deployed to Vercel as a single unit. **Not a monorepo** —
+a workspace would add tooling overhead for no benefit with one deployable and
+one language. (The root `pnpm-workspace.yaml` defines no workspace; it carries
+only build-permission flags that create-next-app writes.)
+
+Next.js is doing full-stack work here in capability only. Almost nothing runs on
+the server:
+
+| Concern | Runs | Why |
+| --- | --- | --- |
+| Generation, grading, scheduling | browser | pure functions; zero cost, zero latency, works offline |
+| Mastery state | browser, `localStorage` | children's data never leaves the device |
+| Word-problem templates | build time | pre-generated and reviewed once |
+| Hints | server, `/api/hint` | the only place an API key can exist |
+| Parent summaries | server, batched | never in the child's path |
+
+A child can answer a thousand problems and reach the server zero times. This is
+the POC's architecture inverted: the .NET service was a network hop on the
+critical path, and removing it is the point.
+
+Revisit the single-package decision if a mobile app needs to share the engine,
+or the engine gets published separately. Extraction is cheap by construction —
+`src/lib/problems` and `src/lib/curriculum` import no React, no Next.js, and no
+DOM, so moving them to `packages/engine` is a directory move plus a
+`package.json`, not a refactor.
+
 ## Data model
 
 Types live in `src/lib/curriculum/types.ts`. The shape:
