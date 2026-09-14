@@ -2,7 +2,7 @@ import { test } from 'vitest'
 import assert from 'node:assert/strict'
 import { startSession, currentProblem, answer, isComplete, summary, SESSION_LENGTH } from './session'
 import { unlockedSkills } from './scheduler'
-import { emptyProgress } from '@/lib/mastery/mastery'
+import { emptyProgress, record, type Progress } from '@/lib/mastery/mastery'
 import { seeded } from '@/lib/problems'
 
 const start = () => startSession(emptyProgress(), seeded(42))
@@ -232,5 +232,67 @@ test('interleaving does not break the existing variety rules', () => {
 test('interleaving stays reproducible from its seed', () => {
   const run = () => startSession({ ...experienced(), placed: [...experienced().placed] },
     seeded(77), { skill: 'a-sub-within-20' }).problems.map((p) => `${p.skill}:${p.prompt}`)
+  assert.deepEqual(run(), run())
+})
+
+// ---- spaced repetition in a session --------------------------------------
+// The whole point of tracking facts: a missed one has to come back.
+
+const HOUR = 60 * 60 * 1000
+
+/** Someone who has practised the easy tables and just got 7 x 8 wrong. */
+function missedSevenEights(): Progress {
+  let p: Progress = {
+    ...emptyProgress(),
+    placed: ['n-bonds-10', 'a-add-within-10', 'a-sub-within-10', 'a-add-within-20',
+             'm-times-2-5-10', 'm-times-3-4', 'm-times-6-7-8-9'],
+    placementDone: true,
+  }
+  p = record(p, {
+    problemId: 'm-times-6-7-8-9#7,8', skill: 'm-times-6-7-8-9', factKey: 'mul:7x8',
+    given: '54', verdict: 'incorrect', elapsedMs: 5000, at: 0,
+  })
+  return p
+}
+
+test('a fact answered wrong comes back', () => {
+  const progress = missedSevenEights()
+  let seen = false
+  // Two sessions, as the acceptance criteria allow.
+  for (const seed of [11, 12]) {
+    const s = startSession(progress, seeded(seed), { skill: 'a-add-within-20', now: HOUR })
+    if (s.problems.some((p) => p.factKey === 'mul:7x8')) seen = true
+  }
+  assert.ok(seen, '7 x 8 was missed and never came back — spaced repetition is not wired up')
+})
+
+test('a fact just answered correctly is not asked again immediately', () => {
+  let progress = missedSevenEights()
+  // Three quick correct answers: now mastered, and should rest.
+  for (let i = 0; i < 3; i++) {
+    progress = record(progress, {
+      problemId: 'm-times-6-7-8-9#7,8', skill: 'm-times-6-7-8-9', factKey: 'mul:7x8',
+      given: '56', verdict: 'correct', elapsedMs: 900, at: HOUR,
+    })
+  }
+  const s = startSession(progress, seeded(5), { skill: 'a-add-within-20', now: HOUR + 1000 })
+  assert.ok(!s.problems.some((p) => p.factKey === 'mul:7x8'), 'a fact just mastered should rest')
+})
+
+test('review falls back to a normal draw when nothing is due', () => {
+  const progress: Progress = {
+    ...emptyProgress(),
+    placed: ['n-bonds-10', 'a-add-within-10', 'a-sub-within-10', 'a-add-within-20'],
+    placementDone: true,
+  }
+  const s = startSession(progress, seeded(8), { skill: 'a-add-within-20', now: HOUR })
+  assert.equal(s.problems.length, SESSION_LENGTH)
+  assert.ok(new Set(s.problems.map((p) => p.skill)).size > 1, 'still interleaves without due facts')
+})
+
+test('targeting due facts stays reproducible from the seed', () => {
+  const progress = missedSevenEights()
+  const run = () => startSession(progress, seeded(3), { skill: 'a-add-within-20', now: HOUR })
+    .problems.map((p) => `${p.skill}:${p.prompt}`)
   assert.deepEqual(run(), run())
 })
