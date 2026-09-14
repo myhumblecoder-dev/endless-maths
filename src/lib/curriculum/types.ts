@@ -80,23 +80,29 @@ export type Problem = {
 /** Spaced-repetition state for one fact. Lives in localStorage, never sent anywhere. */
 export type FactState = {
   factKey: string
-  /** Leitner box; higher = longer interval. */
+  /** Leitner box; higher = longer interval. A wrong answer resets it to 0. */
   box: number
   seen: number
   correct: number
-  /** Fluency signal. A fact is mastered only when this is under the threshold. */
-  medianMs: number
+  /**
+   * The last few response times. Kept as a window rather than a running mean so
+   * the median can ignore an outlier — a child interrupted mid-question has not
+   * forgotten the fact.
+   */
+  recentMs: number[]
   lastSeenAt: number
 }
 
-/** Aggregate state for a procedure skill, where per-instance history is meaningless. */
+/**
+ * Aggregate state for a skill. Procedures use this instead of per-instance
+ * history, because there is no point scheduling one specific two-step equation.
+ */
 export type SkillState = {
   skill: SkillId
   attempts: number
-  /** Success rate over a trailing window, not all time. */
-  recentCorrectRate: number
+  /** Trailing window of verdicts — accuracy now, not accuracy ever. */
+  recent: boolean[]
   lastSeenAt: number
-  mastered: boolean
 }
 
 export type Attempt = {
