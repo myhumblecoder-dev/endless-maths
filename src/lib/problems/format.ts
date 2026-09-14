@@ -15,3 +15,13 @@ export function formatAnswer(answer: Answer): string {
       return ''
   }
 }
+
+/**
+ * What the child sees after answering.
+ *
+ * A wrong answer names the number rather than showing it bare — a lone "8"
+ * where the child expected their own entry reads as confusing, not corrective.
+ */
+export function feedbackText(correct: boolean, expected: string): string {
+  return correct ? '✓ Yes!' : `It's ${expected}`
+}

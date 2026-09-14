@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Keypad } from './Keypad'
 import { SESSION_LENGTH, answer as submitAnswer, currentProblem, isComplete, startSession, summary, type Session } from '@/lib/session/session'
 import { canSubmit as entryCanSubmit, press } from '@/lib/session/keypad'
-import { formatAnswer } from '@/lib/problems/format'
+import { feedbackText, formatAnswer } from '@/lib/problems/format'
 import { seeded } from '@/lib/problems'
 import { SKILL_BY_ID } from '@/lib/curriculum/skills'
 import { browserStore, loadProgress, saveProgress } from '@/lib/mastery/storage'
@@ -142,9 +142,7 @@ export function Practice() {
           }`}
         >
           {feedback
-            ? feedback.correct
-              ? '✓ Yes!'
-              : `${feedback.expected}`
+            ? feedbackText(feedback.correct, feedback.expected)
             : entry || <span className="text-slate-300 dark:text-slate-600">?</span>}
         </div>
       </div>
