@@ -71,6 +71,7 @@ export function record(progress: Progress, attempt: Attempt): Progress {
     const prev = facts[attempt.factKey]
     facts[attempt.factKey] = {
       factKey: attempt.factKey,
+      skill: attempt.skill,
       // One wrong answer sends it back to the start — that is the Leitner rule,
       // and it is what stops a half-known fact drifting out of rotation.
       box: correct ? (prev?.box ?? 0) + 1 : 0,

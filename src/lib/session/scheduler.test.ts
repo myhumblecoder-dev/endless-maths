@@ -1,6 +1,6 @@
 import { test } from 'vitest'
 import assert from 'node:assert/strict'
-import { unlockedSkills, nextSkill, dueFacts } from './scheduler'
+import { unlockedSkills, nextSkill, dueFacts, weakestDueFirst } from './scheduler'
 import { emptyProgress, record, type Progress } from '@/lib/mastery/mastery'
 import { GENERATORS, seeded } from '@/lib/problems'
 import type { SkillId } from '@/lib/curriculum/types'
@@ -106,4 +106,35 @@ test('a mastered fact rests before coming round again', () => {
   for (let i = 0; i < 3; i++) p = record(p, answer('correct', 0))
   assert.ok(!dueFacts(p, 1000).includes('add:3+4'), 'a known fact should rest')
   assert.ok(dueFacts(p, 1000 + 60 * 60 * 1000).includes('add:3+4'), 'but must return eventually')
+})
+
+// ---- targeting facts that are due ----------------------------------------
+// dueFacts() has existed and been tested since the scheduler was written, and
+// nothing called it — so a missed 7 x 8 never came back. See docs/research.md.
+
+test('a fact records which skill it came from', () => {
+  const p = record(emptyProgress(), {
+    problemId: 'm-times-6-7-8-9#7,8', skill: 'm-times-6-7-8-9', factKey: 'mul:7x8',
+    given: '54', verdict: 'incorrect', elapsedMs: 4000, at: 0,
+  })
+  assert.equal(p.facts['mul:7x8'].skill, 'm-times-6-7-8-9', 'without this, a due fact cannot be resurfaced')
+})
+
+test('due facts come back weakest first', () => {
+  let p = emptyProgress()
+  // strong: three quick correct answers
+  for (let i = 0; i < 3; i++) {
+    p = record(p, { problemId: 'a#1', skill: 'm-times-2-5-10', factKey: 'mul:2x3',
+      given: '6', verdict: 'correct', elapsedMs: 800, at: 0 })
+  }
+  // weak: got it wrong
+  p = record(p, { problemId: 'b#1', skill: 'm-times-6-7-8-9', factKey: 'mul:7x8',
+    given: '54', verdict: 'incorrect', elapsedMs: 5000, at: 0 })
+
+  const due = weakestDueFirst(p, 60 * 60 * 1000)
+  assert.equal(due[0], 'mul:7x8', 'the missed fact should be first in the queue')
+})
+
+test('nothing is due for a learner with no history', () => {
+  assert.deepEqual(weakestDueFirst(emptyProgress(), 1000), [])
 })

@@ -45,6 +45,20 @@ export function unlockedSkills(progress: Progress): ImplementedSkill[] {
  */
 const INTERVALS_MS = [0, 30_000, 5 * 60_000, 45 * 60_000, 24 * 3_600_000, 7 * 24 * 3_600_000]
 
+/**
+ * Facts due for review, weakest first.
+ *
+ * Weakness is the Leitner box, then how long it has been waiting — a fact just
+ * answered wrong sits in box 0 and comes back at the front of the queue.
+ */
+export function weakestDueFirst(progress: Progress, now: number): string[] {
+  return dueFacts(progress, now).sort((a, b) => {
+    const fa = progress.facts[a]
+    const fb = progress.facts[b]
+    return fa.box - fb.box || fa.lastSeenAt - fb.lastSeenAt
+  })
+}
+
 export function dueFacts(progress: Progress, now: number): string[] {
   return Object.values(progress.facts)
     .filter((f) => {
