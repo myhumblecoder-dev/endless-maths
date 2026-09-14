@@ -5,7 +5,7 @@ never-ending stream of problems tuned to you. Built for learners who need volume
 and for the people teaching them.
 
 **Production:** https://endless-maths.vercel.app
-**Repo:** https://github.com/myhumblecoder/endless-maths
+**Repo:** https://github.com/myhumblecoder-dev/endless-maths
 
 ## Requirements
 
