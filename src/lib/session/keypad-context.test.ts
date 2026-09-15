@@ -68,3 +68,38 @@ test('the other answer kinds still accept their own keys', () => {
 test('an unparseable expected expression fails loudly', () => {
   assert.throws(() => check(expr('5x+-3'), '5x-3'), /canonical/i)
 })
+
+// ---- inequalities ---------------------------------------------------------
+
+const ineq = (canonical: string): Answer => ({ kind: 'expression', canonical })
+
+test('relation keys appear only when a relation is wanted', () => {
+  assert.equal(isEntryKey('>', ineq('x>5')), true)
+  assert.equal(isEntryKey('<', ineq('x>5')), true)
+  // An expression answer with no relation must not accept one — a stray "<"
+  // would make the entry unparseable and silently disable Check.
+  assert.equal(isEntryKey('>', expr('5x+3')), false)
+  assert.equal(isEntryKey('>', int(5)), false)
+})
+
+test('an inequality can be typed', () => {
+  const answer = ineq('x>5')
+  let entry = ''
+  for (const k of ['x', '>', '5']) entry = press(entry, k, answer)
+  assert.equal(entry, 'x>5')
+  assert.equal(canSubmit(entry, answer), true)
+  assert.equal(check(answer, entry), 'correct')
+})
+
+test('a relation needs a side, and comes only once', () => {
+  const answer = ineq('x>5')
+  assert.equal(press('', '>', answer), '', 'nothing on the left yet')
+  assert.equal(press('x>', '<', answer), 'x>', 'one relation only')
+  assert.equal(press('x>5', '>', answer), 'x>5')
+})
+
+test('a half-written inequality cannot be submitted', () => {
+  const answer = ineq('x>5')
+  assert.equal(canSubmit('x>', answer), false)
+  assert.equal(canSubmit('x', answer), false, 'a bare x is not a range')
+})

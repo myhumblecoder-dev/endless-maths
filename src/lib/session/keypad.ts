@@ -17,7 +17,8 @@ import { normalise } from '@/lib/problems/expression'
 
 export type Entry = string
 
-export type Key = 'back' | 'clear' | '-' | '+' | '.' | '/' | 'r' | ':' | 'x' | string
+export type Key =
+  | 'back' | 'clear' | '-' | '+' | '.' | '/' | 'r' | ':' | 'x' | '<' | '>' | string
 
 /** Ten characters is more than any answer we ask for needs. */
 const MAX_LENGTH = 10
@@ -25,6 +26,14 @@ const MAX_LENGTH = 10
 const isExpression = (answer: Answer) => answer.kind === 'expression'
 const isFraction = (answer: Answer) => answer.kind === 'fraction' || answer.kind === 'mixed'
 const separatorFor = (answer: Answer) => (answer.kind === 'parts' ? answer.separator : undefined)
+
+/**
+ * Is a relation part of this answer? Only inequalities want `<` and `>`; on any
+ * other expression a stray one makes the entry unparseable and silently
+ * disables Check, with nothing on screen to explain why.
+ */
+const wantsRelation = (answer: Answer) =>
+  answer.kind === 'expression' && /[<>]/.test(answer.canonical)
 
 /** Does this key contribute to an answer of this kind? */
 export function isEntryKey(key: string, answer: Answer): boolean {
@@ -45,6 +54,9 @@ export function isEntryKey(key: string, answer: Answer): boolean {
     case 'x':
     case '+':
       return isExpression(answer)
+    case '<':
+    case '>':
+      return wantsRelation(answer)
     default:
       return false
   }
@@ -71,6 +83,11 @@ export function press(entry: Entry, key: Key, answer: Answer): Entry {
     /** Only ever an operator, so it needs something to act on. */
     case '+':
       return /[\dx]$/.test(entry) ? `${entry}+` : entry
+
+    /** One relation, with something on its left. */
+    case '<':
+    case '>':
+      return !/[<>]/.test(entry) && /[\dx]$/.test(entry) ? `${entry}${key}` : entry
 
     /** A term carries at most one unknown: "7xx" is not an expression. */
     case 'x': {
@@ -113,6 +130,8 @@ export function canSubmit(entry: Entry, answer: Answer): boolean {
     case 'choice':
       return true
     case 'expression':
+      // An inequality is not finished until it has its relation and both sides.
+      if (wantsRelation(answer) && !/[<>]=?.+$/.test(entry)) return false
       return normalise(entry) !== undefined
     case 'fraction':
     case 'mixed':

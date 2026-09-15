@@ -47,6 +47,8 @@ export function Keypad({ answer, onKey, onSubmit, canSubmit, disabled }: Props) 
   // Expressions need the unknown and the two operators, which do not fit the
   // single spare slot the other kinds share.
   const isExpression = answer.kind === 'expression'
+  // Only inequalities want the relations; see keypad.ts.
+  const wantsRelation = isExpression && /[<>]/.test(answer.canonical)
 
   return (
     <div className="grid grid-cols-3 gap-3">
@@ -58,6 +60,15 @@ export function Keypad({ answer, onKey, onSubmit, canSubmit, disabled }: Props) 
             className={`${KEY} disabled:opacity-40`} aria-label="Plus">+</button>
           <button type="button" disabled={disabled} onClick={() => onKey('-')}
             className={`${KEY} disabled:opacity-40`} aria-label="Minus">−</button>
+        </>
+      )}
+
+      {wantsRelation && (
+        <>
+          <button type="button" disabled={disabled} onClick={() => onKey('<')}
+            className={`${KEY} col-span-1 disabled:opacity-40`} aria-label="Less than">&lt;</button>
+          <button type="button" disabled={disabled} onClick={() => onKey('>')}
+            className={`${KEY} col-span-2 disabled:opacity-40`} aria-label="Greater than">&gt;</button>
         </>
       )}
 
