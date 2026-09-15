@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Keypad } from './Keypad'
+import { Maths } from './Maths'
 import { SESSION_LENGTH, answer as submitAnswer, completesProblem, currentProblem, isComplete, startSession, summary, type Session } from '@/lib/session/session'
 import { canSubmit as entryCanSubmit, isEntryKey, press } from '@/lib/session/keypad'
 import type { Verdict } from '@/lib/curriculum/types'
@@ -259,7 +260,7 @@ export function Practice({ skill, progress, onProgress, onLeave, onPickSkill, se
 
       <div className="flex flex-1 flex-col justify-center gap-6">
         <p className="text-center text-4xl font-bold tracking-tight text-slate-900 dark:text-slate-50 sm:text-5xl">
-          {problem.prompt}
+          <Maths text={problem.prompt} />
         </p>
 
         <div
@@ -275,8 +276,10 @@ export function Practice({ skill, progress, onProgress, onLeave, onPickSkill, se
           }`}
         >
           {feedback
-            ? feedbackText(feedback.verdict, feedback.expected)
-            : entry || <span className="text-slate-300 dark:text-slate-600">?</span>}
+            ? <Maths text={feedbackText(feedback.verdict, feedback.expected)} />
+            : entry
+              ? <Maths text={entry} />
+              : <span className="text-slate-300 dark:text-slate-600">?</span>}
         </div>
       </div>
 

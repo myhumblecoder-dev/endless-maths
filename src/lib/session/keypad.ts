@@ -20,14 +20,25 @@ export function press(entry: Entry, key: Key): Entry {
     case 'clear':
       return ''
 
-    // Only meaningful at the front, and only once.
+    // Only meaningful at the very front, and only once — never in a denominator.
     case '-':
       return entry === '' ? '-' : entry
 
     // Children write `.5`; show them `0.5` rather than correcting them later.
     case '.':
-      if (entry.includes('.')) return entry
+      if (entry.includes('.') || entry.includes('/')) return entry
       return entry === '' || entry === '-' ? `${entry}0.` : `${entry}.`
+
+    /**
+     * A fraction is held as one string — "3/4" — so parseFraction, check and
+     * every existing test work unchanged, and the two-box display is just a
+     * rendering of it. Needs a numerator first, allows only one slash, and does
+     * not mix with a decimal point.
+     */
+    case '/': {
+      if (entry.includes('/') || entry.includes('.')) return entry
+      return /\d$/.test(entry) ? `${entry}/` : entry
+    }
 
     default:
       return entry.length >= MAX_LENGTH ? entry : entry + key
@@ -40,6 +51,8 @@ export function press(entry: Entry, key: Key): Entry {
  */
 export function canSubmit(entry: Entry): boolean {
   if (entry === '') return false
+  // A fraction needs both halves. "3/" is mid-typing, not an answer.
+  if (entry.includes('/')) return /^-?\d+\/\d+$/.test(entry)
   if (/^-?\d*\.?\d*$/.test(entry)) return /\d$/.test(entry)
   return true // choice answers: 'yes', '<', and so on
 }
@@ -53,5 +66,5 @@ export function canSubmit(entry: Entry): boolean {
  * 2 — and marks a correct answer wrong.
  */
 export function isEntryKey(key: string): boolean {
-  return /^[0-9]$/.test(key) || key === '-' || key === '.'
+  return /^[0-9]$/.test(key) || key === '-' || key === '.' || key === '/'
 }

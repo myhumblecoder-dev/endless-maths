@@ -41,6 +41,7 @@ export function Keypad({ answer, onKey, onSubmit, canSubmit, disabled }: Props) 
 
   const needsMinus = answer.kind === 'integer'
   const needsPoint = answer.kind === 'decimal'
+  const needsSlash = answer.kind === 'fraction' || answer.kind === 'mixed'
 
   return (
     <div className="grid grid-cols-3 gap-3">
@@ -53,11 +54,11 @@ export function Keypad({ answer, onKey, onSubmit, canSubmit, disabled }: Props) 
       <button
         type="button"
         disabled={disabled}
-        onClick={() => onKey(needsPoint ? '.' : needsMinus ? '-' : 'clear')}
+        onClick={() => onKey(needsSlash ? '/' : needsPoint ? '.' : needsMinus ? '-' : 'clear')}
         className={`${KEY} disabled:opacity-40`}
-        aria-label={needsPoint ? 'Decimal point' : needsMinus ? 'Minus' : 'Clear'}
+        aria-label={needsSlash ? 'Divide, for a fraction' : needsPoint ? 'Decimal point' : needsMinus ? 'Minus' : 'Clear'}
       >
-        {needsPoint ? '.' : needsMinus ? '−' : 'C'}
+        {needsSlash ? '/' : needsPoint ? '.' : needsMinus ? '−' : 'C'}
       </button>
 
       <button type="button" disabled={disabled} onClick={() => onKey('0')} className={`${KEY} disabled:opacity-40`}>
