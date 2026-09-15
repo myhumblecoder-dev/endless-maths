@@ -44,9 +44,23 @@ export function Keypad({ answer, onKey, onSubmit, canSubmit, disabled }: Props) 
   const needsSlash = answer.kind === 'fraction' || answer.kind === 'mixed'
   // A quotient-and-remainder or a ratio needs the key that joins its two parts.
   const separator = answer.kind === 'parts' ? answer.separator : undefined
+  // Expressions need the unknown and the two operators, which do not fit the
+  // single spare slot the other kinds share.
+  const isExpression = answer.kind === 'expression'
 
   return (
     <div className="grid grid-cols-3 gap-3">
+      {isExpression && (
+        <>
+          <button type="button" disabled={disabled} onClick={() => onKey('x')}
+            className={`${KEY} disabled:opacity-40`} aria-label="x, the unknown">x</button>
+          <button type="button" disabled={disabled} onClick={() => onKey('+')}
+            className={`${KEY} disabled:opacity-40`} aria-label="Plus">+</button>
+          <button type="button" disabled={disabled} onClick={() => onKey('-')}
+            className={`${KEY} disabled:opacity-40`} aria-label="Minus">−</button>
+        </>
+      )}
+
       {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((d) => (
         <button key={d} type="button" disabled={disabled} onClick={() => onKey(d)} className={`${KEY} disabled:opacity-40`}>
           {d}

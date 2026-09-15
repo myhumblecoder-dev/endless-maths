@@ -8,6 +8,7 @@
 
 import type { Answer, Verdict } from '@/lib/curriculum/types'
 import { isSimplified, parseFraction, sameValue, simplify } from './fraction'
+import { normalise } from './expression'
 
 export function check(expected: Answer, given: string): Verdict {
   const raw = given.trim()
@@ -53,6 +54,17 @@ export function check(expected: Answer, given: string): Verdict {
       return isSimplified(given.num, given.den) ? 'correct' : 'equivalent-unsimplified'
     }
 
+    /**
+     * Collecting like terms happens while parsing, so there is no half-finished
+     * state to nudge about — unlike a fraction or a ratio, an expression is
+     * either equivalent or it is not.
+     */
+    case 'expression': {
+      const given = normalise(raw)
+      if (!given) return 'incorrect'
+      return given === normalise(expected.canonical) ? 'correct' : 'incorrect'
+    }
+
     case 'parts': {
       const parts = raw.split(expected.separator).map((s) => s.trim())
       if (parts.length !== expected.parts.length) return 'incorrect'
@@ -76,7 +88,18 @@ export function check(expected: Answer, given: string): Verdict {
       return 'incorrect'
     }
 
-    default:
-      throw new Error(`check(): answer kind '${expected.kind}' not implemented yet`)
+    /**
+     * Every kind is handled, so TypeScript narrows this to `never` — which
+     * means adding a new answer kind without a branch here is now a compile
+     * error rather than a runtime surprise. The throw stays for anything that
+     * reaches here at runtime despite the types, because the cost of guessing
+     * is marking a correct answer wrong.
+     */
+    default: {
+      const unhandled: never = expected
+      throw new Error(
+        `check(): answer kind '${(unhandled as Answer).kind}' not implemented yet`,
+      )
+    }
   }
 }

@@ -20,10 +20,14 @@ test('clear empties the entry', () => {
   assert.equal(press('123', 'clear'), '')
 })
 
-test('minus is allowed only at the front', () => {
-  assert.equal(press('', '-'), '-')
-  assert.equal(press('5', '-'), '5', 'a minus mid-number is meaningless')
+test('minus is a sign at the front and an operator after a term', () => {
+  assert.equal(press('', '-'), '-', 'leading sign')
   assert.equal(press('-', '-'), '-', 'no double minus')
+  // Superseded by expression input: "5-" is the start of "5-3". It is
+  // meaningless for a plain-number answer, but canSubmit refuses it there, so
+  // nothing can be submitted half-written.
+  assert.equal(press('5', '-'), '5-')
+  assert.equal(canSubmit('5-'), false)
 })
 
 test('a decimal point is allowed once', () => {
@@ -96,7 +100,7 @@ test('backspace walks back out of the denominator', () => {
   assert.equal(press('3/', 'back'), '3')
 })
 
-test('a minus still belongs only at the very front', () => {
+test('a minus never appears inside a fraction', () => {
   assert.equal(press('3/4', '-'), '3/4', 'no minus in a denominator')
 })
 
@@ -111,4 +115,43 @@ test('a half-typed fraction cannot be submitted', () => {
 test('a decimal point and a slash do not mix', () => {
   assert.equal(press('3.5', '/'), '3.5', 'a fraction of a decimal is not a thing here')
   assert.equal(press('3/4', '.'), '3/4')
+})
+
+// ---- expressions ----------------------------------------------------------
+
+test('an expression can actually be typed', () => {
+  let e = ''
+  for (const k of ['7', 'x', '+', '5']) e = press(e, k)
+  assert.equal(e, '7x+5')
+  assert.equal(canSubmit('7x+5'), true)
+})
+
+test('x follows a number or stands alone', () => {
+  assert.equal(press('', 'x'), 'x')
+  assert.equal(press('7', 'x'), '7x')
+  assert.equal(press('7x', 'x'), '7x', 'one x per term')
+  assert.equal(press('7x+', 'x'), '7x+x')
+})
+
+test('plus needs something to add to', () => {
+  assert.equal(press('', '+'), '')
+  assert.equal(press('7x', '+'), '7x+')
+  assert.equal(press('7x+', '+'), '7x+', 'no double operator')
+})
+
+test('minus works as both a sign and an operator', () => {
+  assert.equal(press('', '-'), '-', 'leading sign')
+  assert.equal(press('7x', '-'), '7x-', 'binary minus')
+  assert.equal(press('7x-', '-'), '7x-', 'no double operator')
+})
+
+test('a half-written expression cannot be submitted', () => {
+  assert.equal(canSubmit('7x+'), false)
+  assert.equal(canSubmit('7x-'), false)
+  assert.equal(canSubmit('x'), true)
+  assert.equal(canSubmit('-x'), true)
+})
+
+test('x and the operators are entry keys', () => {
+  for (const k of ['x', '+']) assert.equal(isEntryKey(k), true, `${k} should be an entry key`)
 })

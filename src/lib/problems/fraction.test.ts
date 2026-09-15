@@ -81,6 +81,12 @@ test('nonsense and division by zero are incorrect, never a crash', () => {
   }
 })
 
-test('check still throws for answer kinds it cannot grade', () => {
-  assert.throws(() => check({ kind: 'expression', canonical: 'x' }, 'x'))
+/**
+ * Every answer kind is handled now, so the guard is unreachable in practice.
+ * It stays because the cost of a missing branch is marking a correct answer
+ * wrong, and failing loudly is the only acceptable way to meet that.
+ */
+test('check throws rather than guesses at an answer kind it does not know', () => {
+  const unknown = { kind: 'something-new', value: 1 } as unknown as Answer
+  assert.throws(() => check(unknown, '1'), /not implemented/)
 })

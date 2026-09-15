@@ -5,9 +5,11 @@
  * and the component stays a rendering concern.
  */
 
+import { normalise } from '@/lib/problems/expression'
+
 export type Entry = string
 
-export type Key = 'back' | 'clear' | '-' | '.' | '/' | 'r' | ':' | string
+export type Key = 'back' | 'clear' | '-' | '+' | '.' | '/' | 'r' | ':' | 'x' | string
 
 /** Does the entry already carry a multi-part separator? */
 const hasSeparator = (entry: Entry): boolean => /[r:]/.test(entry)
@@ -23,9 +25,30 @@ export function press(entry: Entry, key: Key): Entry {
     case 'clear':
       return ''
 
-    // Only meaningful at the very front, and only once — never in a denominator.
+    /**
+     * A minus is two different things: the sign at the very front of a number,
+     * and the operator between two terms of an expression. Both are allowed;
+     * two in a row are not.
+     */
     case '-':
-      return entry === '' ? '-' : entry
+      if (entry === '') return '-'
+      // Never inside a fraction or a multi-part answer — those have no
+      // subtraction in them, so a minus there can only be a mistake.
+      if (entry.includes('/') || hasSeparator(entry)) return entry
+      return /[\dx]$/.test(entry) ? `${entry}-` : entry
+
+    /** Only ever an operator, so it needs something to act on. */
+    case '+':
+      return /[\dx]$/.test(entry) ? `${entry}+` : entry
+
+    /**
+     * The unknown. Follows a coefficient or stands alone, but a term carries
+     * at most one — "7xx" is not an expression.
+     */
+    case 'x': {
+      const lastTerm = entry.split(/[+-]/).pop() ?? ''
+      return lastTerm.includes('x') ? entry : `${entry}x`
+    }
 
     // Children write `.5`; show them `0.5` rather than correcting them later.
     case '.':
@@ -65,12 +88,19 @@ export function press(entry: Entry, key: Key): Entry {
  */
 export function canSubmit(entry: Entry): boolean {
   if (entry === '') return false
+  // An expression is submittable exactly when it parses.
+  if (/[x+]/.test(entry)) return normalise(entry) !== undefined
   // Both halves of a multi-part answer are needed; "7r" is mid-typing.
   if (hasSeparator(entry)) return /^\d+[r:]\d+$/.test(entry)
   // A fraction needs both halves. "3/" is mid-typing, not an answer.
   if (entry.includes('/')) return /^-?\d+\/\d+$/.test(entry)
   if (/^-?\d*\.?\d*$/.test(entry)) return /\d$/.test(entry)
-  return true // choice answers: 'yes', '<', and so on
+  /**
+   * What is left should be a choice value — 'yes', '<'. Anything carrying a
+   * digit or an arithmetic character got here by being a malformed number, and
+   * must not fall through as though it were a tapped choice.
+   */
+  return !/[\d.\-]/.test(entry)
 }
 
 /**
@@ -82,5 +112,5 @@ export function canSubmit(entry: Entry): boolean {
  * 2 — and marks a correct answer wrong.
  */
 export function isEntryKey(key: string): boolean {
-  return /^[0-9]$/.test(key) || ['-', '.', '/', 'r', ':'].includes(key)
+  return /^[0-9]$/.test(key) || ['-', '.', '/', 'r', ':', 'x', '+'].includes(key)
 }
