@@ -1,10 +1,10 @@
 'use client'
 
 import { useState } from 'react'
-import { SKILLS } from '@/lib/curriculum/skills'
+import { SKILLS, SKILL_BY_ID } from '@/lib/curriculum/skills'
 import { GENERATORS, type ImplementedSkill } from '@/lib/problems'
 import { isSkillMastered, type Progress } from '@/lib/mastery/mastery'
-import { unlockedSkills, weakestDueFirst } from '@/lib/session/scheduler'
+import { blockedBy, unlockedSkills, weakestDueFirst } from '@/lib/session/scheduler'
 import type { Strand } from '@/lib/curriculum/types'
 
 const STRAND_LABEL: Record<Strand, string> = {
@@ -75,13 +75,25 @@ export function SkillMap({
                   const done = isSkillMastered(progress, skill.id)
                   const open = unlocked.has(skill.id as ImplementedSkill)
 
+                  /**
+                   * A lock with no reason reads as the app being arbitrary, and
+                   * to an older learner as being underestimated. Name the next
+                   * step — the whole chain is true but not actionable.
+                   */
+                  const blockers = open
+                    ? []
+                    : blockedBy(progress, skill.id)
+                        .map((id) => SKILL_BY_ID.get(id)?.label)
+                        .filter((label): label is string => Boolean(label))
+                  const reason = blockers.length > 0 ? `After ${blockers.join(' and ')}` : ''
+
                   return (
                     <li key={skill.id}>
                       <button
                         type="button"
                         disabled={!open}
                         onClick={() => onPick(skill.id as ImplementedSkill)}
-                        aria-label={`${skill.label}${open ? '' : ' (locked)'}`}
+                        aria-label={`${skill.label}${open ? '' : ` (locked. ${reason})`}`}
                         className={`flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-lg transition
                           ${open
                             ? 'bg-slate-100 text-slate-900 hover:bg-slate-200 active:scale-[0.99] dark:bg-slate-800 dark:text-slate-50 dark:hover:bg-slate-700'
@@ -90,7 +102,14 @@ export function SkillMap({
                         <span aria-hidden className="w-5 text-center">
                           {done ? '✓' : open ? '●' : '○'}
                         </span>
-                        <span className="flex-1">{skill.label}</span>
+                        <span className="flex-1">
+                          {skill.label}
+                          {reason && (
+                            <span className="mt-0.5 block text-xs text-slate-400 dark:text-slate-600">
+                              {reason}
+                            </span>
+                          )}
+                        </span>
                         {open && (dueCount.get(skill.id) ?? 0) > 0 && (
                           <span className="text-sm text-sky-600 dark:text-sky-400">
                             {dueCount.get(skill.id)} to review

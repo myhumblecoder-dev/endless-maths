@@ -17,7 +17,7 @@ test('unlocked skills can be chosen', () => {
   const onPick = vi.fn()
   render(<SkillMap progress={placed()} onPick={onPick} onRetakePlacement={() => {}} now={0} />)
 
-  fireEvent.click(screen.getByRole('button', { name: /Number bonds to 10/ }))
+  fireEvent.click(screen.getByRole('button', { name: /^Number bonds to 10/ }))
   assert.deepEqual(onPick.mock.calls, [['n-bonds-10']])
 })
 
@@ -25,7 +25,7 @@ test('locked skills are visible but cannot be chosen', () => {
   const onPick = vi.fn()
   render(<SkillMap progress={placed()} onPick={onPick} onRetakePlacement={() => {}} now={0} />)
 
-  const locked = screen.getByRole('button', { name: /Two-step equations \(locked\)/ }) as HTMLButtonElement
+  const locked = screen.getByRole('button', { name: /^Two-step equations \(locked/ }) as HTMLButtonElement
   assert.equal(locked.disabled, true, 'locks are hard — seeing what is coming must not mean tapping into it')
   fireEvent.click(locked)
   assert.equal(onPick.mock.calls.length, 0)
@@ -33,7 +33,7 @@ test('locked skills are visible but cannot be chosen', () => {
 
 test('mastered skills are marked done', () => {
   render(<SkillMap progress={placed('n-bonds-10')} onPick={() => {}} onRetakePlacement={() => {}} now={0} />)
-  const bonds = screen.getByRole('button', { name: /Number bonds to 10/ })
+  const bonds = screen.getByRole('button', { name: /^Number bonds to 10/ })
   assert.match(bonds.textContent ?? '', /done/)
 })
 
@@ -75,6 +75,38 @@ test('a skill with facts due says so', () => {
     given: '30', verdict: 'incorrect', elapsedMs: 4000, at: 0,
   })
   render(<SkillMap progress={p} onPick={() => {}} onRetakePlacement={() => {}} now={60 * 60 * 1000} />)
-  const row = screen.getByRole('button', { name: /The 2, 5 and 10 times tables/ })
+  const row = screen.getByRole('button', { name: /^The 2, 5 and 10 times tables/ })
   assert.match(row.textContent ?? '', /1 to review/i, 'due work should be visible before starting')
+})
+
+// ---- saying why a topic is locked -----------------------------------------
+
+test('a locked topic says what would unlock it', () => {
+  render(<SkillMap progress={placed()} onPick={() => {}} onRetakePlacement={() => {}} now={0} />)
+
+  const row = screen.getByRole('button', { name: /^Adding to 10/ })
+  assert.match(row.textContent ?? '', /Number bonds to 10/,
+    'a lock with no reason reads as the app being arbitrary')
+})
+
+test('the reason is part of the accessible name, not just colour', () => {
+  render(<SkillMap progress={placed()} onPick={() => {}} onRetakePlacement={() => {}} now={0} />)
+  // Screen readers and greyed text are not the same channel.
+  expect(screen.getByRole('button', { name: /^Adding to 10.*Number bonds to 10/ })).toBeTruthy()
+})
+
+test('only the next step is named, not the whole chain', () => {
+  render(<SkillMap progress={placed()} onPick={() => {}} onRetakePlacement={() => {}} now={0} />)
+
+  const row = screen.getByRole('button', { name: /^Two-step equations/ })
+  assert.match(row.textContent ?? '', /One-step equations|negatives/i)
+  assert.doesNotMatch(row.textContent ?? '', /Number bonds/,
+    'the far end of the chain is true but useless')
+})
+
+test('an unlocked topic says nothing extra', () => {
+  render(<SkillMap progress={placed()} onPick={() => {}} onRetakePlacement={() => {}} now={0} />)
+
+  const row = screen.getByRole('button', { name: /^Number bonds to 10/ })
+  assert.doesNotMatch(row.textContent ?? '', /after|needs/i)
 })

@@ -31,6 +31,22 @@ function effectivePrereqs(id: SkillId, seen = new Set<SkillId>()): ImplementedSk
   )
 }
 
+/**
+ * What stands between the learner and this skill: the immediate prerequisites
+ * not yet mastered, in curriculum order.
+ *
+ * Immediate, not transitive. Being told "you need number bonds" when you are
+ * looking at two-step equations is true and useless — the next step is what is
+ * actionable, and each blocker's own row explains itself in turn.
+ *
+ * Uses the same `effectivePrereqs` walk that decides the lock, so the
+ * explanation can never disagree with the lock, and nobody is sent to practise
+ * a skill that does not exist.
+ */
+export function blockedBy(progress: Progress, skill: SkillId): ImplementedSkill[] {
+  return effectivePrereqs(skill).filter((req) => !isSkillMastered(progress, req))
+}
+
 /** Skills the learner has earned the right to meet. */
 export function unlockedSkills(progress: Progress): ImplementedSkill[] {
   return (Object.keys(GENERATORS) as ImplementedSkill[]).filter((id) =>

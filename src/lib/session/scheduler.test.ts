@@ -1,8 +1,8 @@
 import { test } from 'vitest'
 import assert from 'node:assert/strict'
-import { unlockedSkills, nextSkill, dueFacts, weakestDueFirst } from './scheduler'
+import { unlockedSkills, nextSkill, dueFacts, weakestDueFirst, blockedBy } from './scheduler'
 import { emptyProgress, record, type Progress } from '@/lib/mastery/mastery'
-import { GENERATORS, seeded } from '@/lib/problems'
+import { GENERATORS, seeded, type ImplementedSkill } from '@/lib/problems'
 import type { SkillId } from '@/lib/curriculum/types'
 
 /** Drive a skill to mastery: ten correct, fast answers. */
@@ -137,4 +137,58 @@ test('due facts come back weakest first', () => {
 
 test('nothing is due for a learner with no history', () => {
   assert.deepEqual(weakestDueFirst(emptyProgress(), 1000), [])
+})
+
+// ---- explaining a lock ----------------------------------------------------
+// A lock with no reason reads as the app being arbitrary. The information
+// already existed — effectivePrereqs decides the lock — it just was not shown.
+
+test('an unlocked skill is blocked by nothing', () => {
+  assert.deepEqual(blockedBy(emptyProgress(), 'n-bonds-10'), [])
+})
+
+test('a locked skill names what would open it', () => {
+  assert.deepEqual(blockedBy(emptyProgress(), 'a-add-within-10'), ['n-bonds-10'])
+})
+
+test('only the immediate blockers, not the whole chain', () => {
+  // Two-step equations sit a long way up, but the learner only needs to be
+  // told the next thing — each blocker's own row explains itself.
+  const blockers = blockedBy(emptyProgress(), 'p-solve-two-step')
+  assert.deepEqual(blockers, ['p-solve-one-step', 'r-negative-add-sub'])
+  assert.ok(!blockers.includes('n-bonds-10'), 'the far end of the chain is not actionable')
+})
+
+test('a blocker that is already mastered drops off the list', () => {
+  let p: Progress = {
+    ...emptyProgress(),
+    placed: ['n-bonds-10', 'a-add-within-10', 'a-sub-within-10'],
+    placementDone: true,
+  }
+  assert.deepEqual(blockedBy(p, 'a-add-within-20'), [], 'its only prerequisite is done')
+  p = { ...p, placed: ['n-bonds-10'] }
+  assert.deepEqual(blockedBy(p, 'a-sub-within-20'), ['a-sub-within-10', 'a-add-within-20'])
+})
+
+/**
+ * Unbuilt prerequisites are stepped over when deciding a lock, so they must be
+ * stepped over when explaining one — nobody should be told to go and practise
+ * a skill that does not exist.
+ */
+test('nobody is told to practise something that does not exist', () => {
+  const everywhere = Object.keys(GENERATORS) as ImplementedSkill[]
+  for (const skill of everywhere) {
+    for (const blocker of blockedBy(emptyProgress(), skill)) {
+      assert.ok(blocker in GENERATORS, `${skill} is blocked by unbuilt ${blocker}`)
+    }
+  }
+})
+
+test('every locked skill can explain itself', () => {
+  const progress = emptyProgress()
+  const unlocked = new Set(unlockedSkills(progress))
+  for (const skill of Object.keys(GENERATORS) as ImplementedSkill[]) {
+    if (unlocked.has(skill)) continue
+    assert.ok(blockedBy(progress, skill).length > 0, `${skill} is locked for no stated reason`)
+  }
 })
