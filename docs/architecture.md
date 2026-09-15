@@ -57,6 +57,10 @@ would make extracting an engine package a directory move rather than a refactor.
 - **`index.ts`** — the `GENERATORS` registry and `generate()`.
 - **`check.ts`** — grading. Throws on answer kinds it cannot grade rather than
   guessing, because a wrong `false` marks a correct answer wrong.
+- **`fraction.ts`** — integer-only fraction arithmetic: `gcd`, `simplify`,
+  `parseFraction`, `sameValue`. Nothing here converts to a decimal, because
+  `1/3` has none and comparing by float would eventually mark a correct answer
+  wrong.
 - **`format.ts`** — `formatAnswer()`, `feedbackText()`. Presentation only.
 
 ### `lib/mastery/`
@@ -66,7 +70,10 @@ would make extracting an engine package a directory move rather than a refactor.
 
 ### `lib/session/`
 - **`scheduler.ts`** — `unlockedSkills()`, `nextSkill()`, `dueFacts()`.
-- **`session.ts`** — a bounded run of problems; `answer()` grades and records.
+- **`session.ts`** — a bounded run of problems; `answer()` grades and records,
+  and the session mix interleaves review with the chosen skill.
+- **`diagnose.ts`** — `isStruggling()`, `gapBehind()`. Finds the weak foundation
+  under a skill someone keeps failing.
 - **`keypad.ts`** — `press()`, `canSubmit()`, `isEntryKey()`. Pure input rules.
 
 ### `lib/placement/`
@@ -139,9 +146,7 @@ missing branch fails loudly rather than marking a learner wrong.
 
 ## Known gaps
 
-- **`dueFacts()` and `findGaps()` are built, tested, and unused.** A focused
-  session is 100% one skill — blocked practice, which the research says is the
-  weaker option.
-- **16 of 55 skills are unimplemented**, including the whole fractions strand.
+- **15 of 55 skills are unimplemented**, including all nine fraction skills.
+  `check()` grades fractions but nothing generates one yet.
 - **No server code exists yet.** The hints path is designed, not built.
 - **Placement is a single snapshot.** "Change my level" is the only correction.
