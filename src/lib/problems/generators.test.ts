@@ -22,8 +22,10 @@ test('every implemented skill exists in the curriculum graph', () => {
 test('produced answer kind matches the kind declared in skills.ts', () => {
   for (const skill of IMPLEMENTED) {
     const declared = SKILL_BY_ID.get(skill)!.answerKind
+    const allowed = Array.isArray(declared) ? declared : [declared]
     for (const p of sample(skill, 200)) {
-      assert.equal(p.answer.kind, declared, `${skill}: declared ${declared}, produced ${p.answer.kind}`)
+      assert.ok(allowed.includes(p.answer.kind),
+        `${skill}: declared ${allowed.join('|')}, produced ${p.answer.kind}`)
     }
   }
 })

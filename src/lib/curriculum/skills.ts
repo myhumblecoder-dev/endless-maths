@@ -55,7 +55,7 @@ export const SKILLS: Skill[] = [
   { id: 'f-decimal-place-value', strand: 'fractions', kind: 'procedure', label: 'Tenths and hundredths', requires: ['n-place-value-1000', 'f-identify'], answerKind: 'integer', typicalAge: [9, 10] },
   { id: 'f-decimal-add-sub', strand: 'fractions', kind: 'procedure', label: 'Adding and subtracting decimals', requires: ['f-decimal-place-value', 'a-add-3digit'], answerKind: 'decimal', typicalAge: [9, 11] },
   { id: 'f-decimal-mult', strand: 'fractions', kind: 'procedure', label: 'Multiplying decimals', requires: ['f-decimal-add-sub', 'm-long-mult'], answerKind: 'decimal', typicalAge: [10, 12] },
-  { id: 'f-convert-fdp', strand: 'fractions', kind: 'procedure', label: 'Fractions, decimals and percentages', requires: ['f-decimal-place-value', 'f-equivalent'], answerKind: 'decimal', typicalAge: [10, 12] },
+  { id: 'f-convert-fdp', strand: 'fractions', kind: 'procedure', label: 'Fractions, decimals and percentages', requires: ['f-decimal-place-value', 'f-equivalent'], answerKind: ['decimal', 'integer', 'fraction'], typicalAge: [10, 12] },
   { id: 'f-percent-of', strand: 'fractions', kind: 'procedure', label: 'Percentages of amounts', requires: ['f-convert-fdp', 'm-2digit-x-1digit'], answerKind: 'integer', typicalAge: [10, 12] },
 
   // ---- ratio, negatives, order of operations ------------------------------

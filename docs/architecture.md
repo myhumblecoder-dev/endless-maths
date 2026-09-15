@@ -52,8 +52,8 @@ would make extracting an engine package a directory move rather than a refactor.
 ### `lib/problems/`
 - **`rng.ts`** — seeded `mulberry32`, `pick`, `pickFrom`, `until`.
 - **`build.ts`** — `int()`, `dec()`, `choice()`, `problem()`.
-- **`numberSense · addSub · mulDiv · decimals · ratioNegatives · preAlgebra`** —
-  the 39 implemented generators, grouped by strand.
+- **`numberSense · addSub · mulDiv · decimals · fractions · ratioNegatives ·
+  preAlgebra`** — the 48 implemented generators, grouped by strand.
 - **`index.ts`** — the `GENERATORS` registry and `generate()`.
 - **`check.ts`** — grading. Throws on answer kinds it cannot grade rather than
   guessing, because a wrong `false` marks a correct answer wrong.
@@ -146,7 +146,8 @@ missing branch fails loudly rather than marking a learner wrong.
 
 ## Known gaps
 
-- **15 of 55 skills are unimplemented**, including all nine fraction skills.
-  `check()` grades fractions but nothing generates one yet.
+- **7 of 55 skills are unimplemented**: the three expression skills, three
+  needing multi-part answers, and `n-count-20` (which needs a visual counting
+  interface and is irrelevant to this audience).
 - **No server code exists yet.** The hints path is designed, not built.
 - **Placement is a single snapshot.** "Change my level" is the only correction.

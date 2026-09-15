@@ -58,7 +58,12 @@ export type Skill = {
   label: string
   /** Must all be mastered before this is scheduled. Forms a DAG. */
   requires: SkillId[]
-  answerKind: AnswerKind
+  /**
+   * What an answer looks like. A list where the skill genuinely has several —
+   * converting between fractions, decimals and percentages asks in more than
+   * one direction, so the answer kind depends on the question.
+   */
+  answerKind: AnswerKind | AnswerKind[]
   /** Rough age band, for placement only — never shown to the child. */
   typicalAge: [number, number]
 }
