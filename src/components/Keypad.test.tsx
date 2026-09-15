@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { test, afterEach, expect, vi } from 'vitest'
+import { test, afterEach, vi } from 'vitest'
 import assert from 'node:assert/strict'
 import { render, screen, fireEvent, cleanup } from '@testing-library/react'
 import { Keypad } from './Keypad'
