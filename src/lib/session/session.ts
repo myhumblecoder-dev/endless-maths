@@ -5,7 +5,7 @@
  * docs/design.md § Endless supply, bounded sessions.
  */
 
-import type { Attempt, Problem, Rng } from '@/lib/curriculum/types'
+import type { Attempt, Problem, Rng, Verdict } from '@/lib/curriculum/types'
 import { GENERATORS, generate, type ImplementedSkill } from '@/lib/problems'
 import { check } from '@/lib/problems/check'
 import { record, type Progress } from '@/lib/mastery/mastery'
@@ -210,6 +210,16 @@ export function answer(s: Session, given: string, elapsedMs: number, at: number)
     progress: record(s.progress, attempt),
   }
 }
+
+/**
+ * Does this verdict move the learner on?
+ *
+ * Everything does except an unsimplified answer — the value is right but the
+ * skill is not finished, so they stay on the question and try again. See
+ * docs/design.md, "Simplifying is part of the skill".
+ */
+export const completesProblem = (verdict: Verdict): boolean =>
+  verdict !== 'equivalent-unsimplified'
 
 export function summary(s: Session) {
   return {

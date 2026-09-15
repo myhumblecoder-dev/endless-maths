@@ -57,6 +57,10 @@ would make extracting an engine package a directory move rather than a refactor.
 - **`index.ts`** — the `GENERATORS` registry and `generate()`.
 - **`check.ts`** — grading. Throws on answer kinds it cannot grade rather than
   guessing, because a wrong `false` marks a correct answer wrong.
+- **`fraction.ts`** — integer-only fraction arithmetic: `gcd`, `simplify`,
+  `parseFraction`, `sameValue`. Nothing here converts to a decimal, because
+  `1/3` has none and comparing by float would eventually mark a correct answer
+  wrong.
 - **`format.ts`** — `formatAnswer()`, `feedbackText()`. Presentation only.
 
 ### `lib/mastery/`
