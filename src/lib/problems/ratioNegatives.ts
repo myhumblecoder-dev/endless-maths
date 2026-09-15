@@ -1,6 +1,7 @@
 import type { Generator, Rng } from '@/lib/curriculum/types'
-import { pick, pickFrom } from './rng'
+import { pick, pickFrom, until } from './rng'
 import { choice, int, problem } from './build'
+import { gcd, simplify } from './fraction'
 
 const PRIMES_TO_100 = [2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47,
   53, 59, 61, 67, 71, 73, 79, 83, 89, 97] as const
@@ -74,4 +75,52 @@ export const rProportion: Generator = (rng: Rng) => {
     int(n2 * unit),
     [n1, n1 * unit, n2],
   )
+}
+
+/**
+ * Simplifying a ratio.
+ *
+ * Always poses a ratio that genuinely needs work — an already-simplified one
+ * would leave nothing to do. Restating the question grades as
+ * equivalent-unsimplified rather than wrong, exactly as an unsimplified
+ * fraction does; see docs/design.md.
+ */
+export const rRatioSimplify: Generator = (rng: Rng) => {
+  const base = until(
+    () => ({ a: pick(rng, 1, 9), b: pick(rng, 1, 9) }),
+    ({ a, b }) => gcd(a, b) === 1 && a !== b,
+  )
+  const factor = pick(rng, 2, 6)
+  const reduced = simplify(base.a, base.b)
+  return problem(
+    'r-ratio-simplify',
+    `Simplify ${base.a * factor} : ${base.b * factor}`,
+    { kind: 'parts', parts: [reduced.num, reduced.den], separator: ':' },
+    [base.a * factor, base.b * factor],
+  )
+}
+
+/**
+ * Factors and multiples, asked as highest common factor and lowest common
+ * multiple — both of which have one whole-number answer.
+ *
+ * Listing every factor of 24 is a Year 5 activity and would need a long
+ * comma-separated entry. HCF and LCM are what an 11- to 13-year-old actually
+ * does, and they are precisely what adding fractions with unlike denominators
+ * depends on.
+ */
+export const rFactorsMultiples: Generator = (rng: Rng) => {
+  const wantHighest = rng() < 0.5
+
+  // A shared factor by construction, so "highest common factor" is never a
+  // pointless 1, and the multiple stays small enough to work out mentally.
+  const shared = pick(rng, 2, 9)
+  const { x, y } = until(
+    () => ({ x: shared * pick(rng, 2, 9), y: shared * pick(rng, 2, 9) }),
+    ({ x, y }) => x !== y && (x * y) / gcd(x, y) <= 400,
+  )
+
+  return wantHighest
+    ? problem('r-factors-multiples', `Highest common factor of ${x} and ${y}`, int(gcd(x, y)), [x, y])
+    : problem('r-factors-multiples', `Lowest common multiple of ${x} and ${y}`, int((x * y) / gcd(x, y)), [x, y])
 }

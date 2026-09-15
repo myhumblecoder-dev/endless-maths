@@ -31,7 +31,6 @@ export type AnswerKind =
   | 'fraction'
   | 'mixed'
   | 'expression'
-  | 'set'
   | 'choice'
   | 'parts'
 
@@ -42,8 +41,6 @@ export type Answer =
   | { kind: 'mixed'; whole: number; num: number; den: number }
   /** `canonical` is a normalized spelling, so `3 + 5x` and `5x + 3` compare equal. */
   | { kind: 'expression'; canonical: string }
-  /** Order-independent, e.g. every factor of 24. */
-  | { kind: 'set'; values: number[] }
   /**
    * Two numbers that belong together: a quotient and a remainder, or the two
    * sides of a ratio. The separator decides how it is written, how it is typed,

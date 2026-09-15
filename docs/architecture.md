@@ -146,8 +146,8 @@ missing branch fails loudly rather than marking a learner wrong.
 
 ## Known gaps
 
-- **7 of 55 skills are unimplemented**: the three expression skills, three
-  needing multi-part answers, and `n-count-20` (which needs a visual counting
-  interface and is irrelevant to this audience).
+- **4 of 55 skills are unimplemented**: the three expression skills (#16-18),
+  and `n-count-20`, which needs a visual counting interface and is irrelevant
+  to an 11- and 13-year-old.
 - **No server code exists yet.** The hints path is designed, not built.
 - **Placement is a single snapshot.** "Change my level" is the only correction.

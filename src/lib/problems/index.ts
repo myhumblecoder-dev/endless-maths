@@ -6,7 +6,7 @@
  * Deliberately excluded — see docs/design.md § Implementation tiers:
  *  - the rest of the fractions strand (adding, subtracting, multiplying, dividing)
  *  - collecting like terms, expanding brackets, inequalities (expression engine)
- *  - counting to 20, factors and multiples, ratios (other input widgets)
+ *  - counting to 20 (needs a visual counting interface)
  */
 
 import type { Generator, Problem, Rng, SkillId } from '@/lib/curriculum/types'
@@ -53,6 +53,8 @@ export const GENERATORS = {
   'r-negative-add-sub': rn.rNegativeAddSub,
   'r-negative-mul-div': rn.rNegativeMulDiv,
   'r-proportion': rn.rProportion,
+  'r-factors-multiples': rn.rFactorsMultiples,
+  'r-ratio-simplify': rn.rRatioSimplify,
 
   'f-identify': fr.fIdentify,
   'f-equivalent': fr.fEquivalent,
