@@ -7,7 +7,10 @@
 
 export type Entry = string
 
-export type Key = 'back' | 'clear' | '-' | '.' | string
+export type Key = 'back' | 'clear' | '-' | '.' | '/' | 'r' | ':' | string
+
+/** Does the entry already carry a multi-part separator? */
+const hasSeparator = (entry: Entry): boolean => /[r:]/.test(entry)
 
 /** Ten characters is already more than any Tier 1 answer needs. */
 const MAX_LENGTH = 10
@@ -36,8 +39,19 @@ export function press(entry: Entry, key: Key): Entry {
      * not mix with a decimal point.
      */
     case '/': {
-      if (entry.includes('/') || entry.includes('.')) return entry
+      if (entry.includes('/') || entry.includes('.') || hasSeparator(entry)) return entry
       return /\d$/.test(entry) ? `${entry}/` : entry
+    }
+
+    /**
+     * The separator between a quotient and its remainder, or the two sides of a
+     * ratio. Same rules as the slash: a number has to come first, it appears
+     * once, and it does not mix with a fraction or a decimal.
+     */
+    case 'r':
+    case ':': {
+      if (hasSeparator(entry) || entry.includes('/') || entry.includes('.')) return entry
+      return /\d$/.test(entry) ? `${entry}${key}` : entry
     }
 
     default:
@@ -51,6 +65,8 @@ export function press(entry: Entry, key: Key): Entry {
  */
 export function canSubmit(entry: Entry): boolean {
   if (entry === '') return false
+  // Both halves of a multi-part answer are needed; "7r" is mid-typing.
+  if (hasSeparator(entry)) return /^\d+[r:]\d+$/.test(entry)
   // A fraction needs both halves. "3/" is mid-typing, not an answer.
   if (entry.includes('/')) return /^-?\d+\/\d+$/.test(entry)
   if (/^-?\d*\.?\d*$/.test(entry)) return /\d$/.test(entry)
@@ -66,5 +82,5 @@ export function canSubmit(entry: Entry): boolean {
  * 2 — and marks a correct answer wrong.
  */
 export function isEntryKey(key: string): boolean {
-  return /^[0-9]$/.test(key) || key === '-' || key === '.' || key === '/'
+  return /^[0-9]$/.test(key) || ['-', '.', '/', 'r', ':'].includes(key)
 }

@@ -13,7 +13,7 @@ function typeIn(text: string): string {
 }
 
 /** Answer kinds the keypad can produce character by character. */
-const TYPEABLE = new Set(['integer', 'decimal', 'fraction'])
+const TYPEABLE = new Set(['integer', 'decimal', 'fraction', 'parts'])
 
 /** Every spelling a person might reasonably produce for this answer. */
 function spellings(a: Answer): string[] {
@@ -27,6 +27,11 @@ function spellings(a: Answer): string[] {
       return [a.value]
     case 'fraction':
       return [`${a.num}/${a.den}`]
+    case 'parts':
+      // Unspaced only: the keypad has no space key, so "7 r 2" is a spelling
+      // check() accepts, not one a learner can produce key by key. The spaced
+      // forms are covered in parts.test.ts.
+      return [a.parts.join(a.separator)]
     case 'mixed':
       // Both forms are the same answer; a learner may type either.
       return [`${a.whole} ${a.num}/${a.den}`, `${a.whole * a.den + a.num}/${a.den}`]
@@ -75,14 +80,17 @@ test('the keypad can physically produce every answer', () => {
       const p = generate(skill, rng)
       if (p.answer.kind === 'choice') continue
       const a = p.answer
-      if (a.kind !== 'integer' && a.kind !== 'decimal' && a.kind !== 'fraction') continue
+      if (!TYPEABLE.has(a.kind)) continue
       const text = a.kind === 'decimal' ? a.value.toFixed(a.dp)
         : a.kind === 'fraction' ? `${a.num}/${a.den}`
-        : String(a.value)
+        : a.kind === 'parts' ? a.parts.join(a.separator)
+        : a.kind === 'integer' ? String(a.value)
+        : ''
       // Keys the keypad offers for this answer kind.
       const keys = new Set([
         '0','1','2','3','4','5','6','7','8','9','back',
-        a.kind === 'decimal' ? '.' : a.kind === 'fraction' ? '/' : '-',
+        a.kind === 'decimal' ? '.' : a.kind === 'fraction' ? '/'
+          : a.kind === 'parts' ? a.separator : '-',
       ])
       for (const ch of text) {
         const key = ch === '-' || ch === '−' ? '-' : ch

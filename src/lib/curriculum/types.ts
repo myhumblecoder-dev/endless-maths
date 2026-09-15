@@ -23,6 +23,8 @@ export type Strand =
  */
 export type SkillKind = 'fact' | 'procedure'
 
+export type PartSeparator = 'r' | ':'
+
 export type AnswerKind =
   | 'integer'
   | 'decimal'
@@ -31,6 +33,7 @@ export type AnswerKind =
   | 'expression'
   | 'set'
   | 'choice'
+  | 'parts'
 
 export type Answer =
   | { kind: 'integer'; value: number }
@@ -39,8 +42,15 @@ export type Answer =
   | { kind: 'mixed'; whole: number; num: number; den: number }
   /** `canonical` is a normalized spelling, so `3 + 5x` and `5x + 3` compare equal. */
   | { kind: 'expression'; canonical: string }
-  /** Order-independent, e.g. the factor pairs of 24. */
-  | { kind: 'set'; values: Answer[] }
+  /** Order-independent, e.g. every factor of 24. */
+  | { kind: 'set'; values: number[] }
+  /**
+   * Two numbers that belong together: a quotient and a remainder, or the two
+   * sides of a ratio. The separator decides how it is written, how it is typed,
+   * and whether "unsimplified" even means anything — it does for a ratio and
+   * emphatically does not for a remainder.
+   */
+  | { kind: 'parts'; parts: number[]; separator: PartSeparator }
   /** A pick from a small fixed set: `<`/`>`/`=`, yes/no. Needs buttons, not a keypad. */
   | { kind: 'choice'; value: string; options: string[] }
 
