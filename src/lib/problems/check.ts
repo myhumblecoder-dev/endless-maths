@@ -7,7 +7,8 @@
  */
 
 import type { Answer, Verdict } from '@/lib/curriculum/types'
-import { isSimplified, parseFraction, sameValue } from './fraction'
+import { isSimplified, parseFraction, sameValue, simplify } from './fraction'
+import { normalise } from './expression'
 
 export function check(expected: Answer, given: string): Verdict {
   const raw = given.trim()
@@ -53,7 +54,58 @@ export function check(expected: Answer, given: string): Verdict {
       return isSimplified(given.num, given.den) ? 'correct' : 'equivalent-unsimplified'
     }
 
-    default:
-      throw new Error(`check(): answer kind '${expected.kind}' not implemented yet`)
+    /**
+     * Collecting like terms happens while parsing, so there is no half-finished
+     * state to nudge about — unlike a fraction or a ratio, an expression is
+     * either equivalent or it is not.
+     */
+    case 'expression': {
+      const want = normalise(expected.canonical)
+      if (!want) {
+        // Comparing against an unparseable canonical would return false for
+        // every input, including the right one — silently marking correct
+        // answers wrong. Fail loudly instead.
+        throw new Error(`check(): expected canonical '${expected.canonical}' does not parse`)
+      }
+      const given = normalise(raw)
+      return given === want ? 'correct' : 'incorrect'
+    }
+
+    case 'parts': {
+      const parts = raw.split(expected.separator).map((s) => s.trim())
+      if (parts.length !== expected.parts.length) return 'incorrect'
+      if (!parts.every((s) => /^\d+$/.test(s))) return 'incorrect'
+
+      const given = parts.map(Number)
+      if (given.every((n, i) => n === expected.parts[i])) return 'correct'
+
+      /**
+       * A ratio has a right value in the wrong form, exactly like a fraction —
+       * "4 : 6" is 2 : 3 unsimplified. A remainder does not: "14 r 4" is simply
+       * a different answer from "7 r 2", even though 14:4 reduces to 7:2.
+       */
+      if (expected.separator === ':' && given.length === 2) {
+        const reduced = simplify(given[0], given[1])
+        if (reduced.num === expected.parts[0] && reduced.den === expected.parts[1]) {
+          return 'equivalent-unsimplified'
+        }
+      }
+
+      return 'incorrect'
+    }
+
+    /**
+     * Every kind is handled, so TypeScript narrows this to `never` — which
+     * means adding a new answer kind without a branch here is now a compile
+     * error rather than a runtime surprise. The throw stays for anything that
+     * reaches here at runtime despite the types, because the cost of guessing
+     * is marking a correct answer wrong.
+     */
+    default: {
+      const unhandled: never = expected
+      throw new Error(
+        `check(): answer kind '${(unhandled as Answer).kind}' not implemented yet`,
+      )
+    }
   }
 }

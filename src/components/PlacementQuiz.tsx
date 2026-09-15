@@ -76,10 +76,10 @@ export function PlacementQuiz({ onDone }: { onDone: (progress: Progress) => void
           answer={probe.answer}
           onKey={(key) => {
             if (key.startsWith('choice:')) commit(key.slice('choice:'.length))
-            else setEntry((e) => press(e, key))
+            else setEntry((e) => press(e, key, probe.answer))
           }}
           onSubmit={() => commit(entry)}
-          canSubmit={entryCanSubmit(entry)}
+          canSubmit={entryCanSubmit(entry, probe.answer)}
           disabled={false}
         />
         {/* A beginner must be able to move on without guessing wildly. */}

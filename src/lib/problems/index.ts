@@ -5,8 +5,7 @@
  *
  * Deliberately excluded — see docs/design.md § Implementation tiers:
  *  - the rest of the fractions strand (adding, subtracting, multiplying, dividing)
- *  - collecting like terms, expanding brackets, inequalities (expression engine)
- *  - counting to 20, factors/multiples, ratios, remainders (other input widgets)
+ *  - counting to 20 (needs a visual counting interface)
  */
 
 import type { Generator, Problem, Rng, SkillId } from '@/lib/curriculum/types'
@@ -43,6 +42,7 @@ export const GENERATORS = {
   'm-div-3-4': md.mDiv34,
   'm-div-6-7-8-9': md.mDiv6789,
   'm-2digit-x-1digit': md.m2DigitBy1Digit,
+  'm-div-remainder': md.mDivRemainder,
   'm-long-mult': md.mLongMult,
   'm-long-div': md.mLongDiv,
 
@@ -52,6 +52,8 @@ export const GENERATORS = {
   'r-negative-add-sub': rn.rNegativeAddSub,
   'r-negative-mul-div': rn.rNegativeMulDiv,
   'r-proportion': rn.rProportion,
+  'r-factors-multiples': rn.rFactorsMultiples,
+  'r-ratio-simplify': rn.rRatioSimplify,
 
   'f-identify': fr.fIdentify,
   'f-equivalent': fr.fEquivalent,
@@ -68,6 +70,9 @@ export const GENERATORS = {
   'f-decimal-mult': dc.fDecimalMult,
 
   'p-evaluate': pa.pEvaluate,
+  'p-like-terms': pa.pLikeTerms,
+  'p-distribute': pa.pDistribute,
+  'p-inequalities': pa.pInequalities,
   'p-solve-one-step': pa.pSolveOneStep,
   'p-solve-two-step': pa.pSolveTwoStep,
   'p-solve-both-sides': pa.pSolveBothSides,
