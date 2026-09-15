@@ -38,7 +38,7 @@ export const SKILLS: Skill[] = [
   { id: 'm-div-2-5-10', strand: 'mul-div', kind: 'fact', label: 'Dividing by 2, 5 and 10', requires: ['m-times-2-5-10'], answerKind: 'integer', typicalAge: [7, 9] },
   { id: 'm-div-3-4', strand: 'mul-div', kind: 'fact', label: 'Dividing by 3 and 4', requires: ['m-times-3-4', 'm-div-2-5-10'], answerKind: 'integer', typicalAge: [8, 9] },
   { id: 'm-div-6-7-8-9', strand: 'mul-div', kind: 'fact', label: 'Dividing by 6, 7, 8 and 9', requires: ['m-times-6-7-8-9', 'm-div-3-4'], answerKind: 'integer', typicalAge: [9, 10] },
-  { id: 'm-div-remainder', strand: 'mul-div', kind: 'procedure', label: 'Division with remainders', requires: ['m-div-6-7-8-9'], answerKind: 'set', typicalAge: [9, 10] },
+  { id: 'm-div-remainder', strand: 'mul-div', kind: 'procedure', label: 'Division with remainders', requires: ['m-div-6-7-8-9'], answerKind: 'parts', typicalAge: [9, 10] },
   { id: 'm-2digit-x-1digit', strand: 'mul-div', kind: 'procedure', label: 'Two-digit times one-digit', requires: ['m-times-6-7-8-9', 'a-add-2digit-regroup'], answerKind: 'integer', typicalAge: [9, 10] },
   { id: 'm-long-mult', strand: 'mul-div', kind: 'procedure', label: 'Long multiplication', requires: ['m-2digit-x-1digit'], answerKind: 'integer', typicalAge: [10, 11] },
   { id: 'm-long-div', strand: 'mul-div', kind: 'procedure', label: 'Long division', requires: ['m-div-remainder', 'm-long-mult'], answerKind: 'integer', typicalAge: [10, 12] },

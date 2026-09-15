@@ -45,6 +45,27 @@ export const m2DigitBy1Digit: Generator = (rng: Rng) => {
 }
 
 /**
+ * Division that does not come out exactly.
+ *
+ * Built backwards, like every other division here: pick the quotient, divisor
+ * and remainder, then present the dividend they imply. The remainder is always
+ * at least 1 — a remainder of zero is exact division, which is a different
+ * skill the learner has already met.
+ */
+export const mDivRemainder: Generator = (rng: Rng) => {
+  const divisor = pick(rng, 3, 12)
+  const quotient = pick(rng, 2, 20)
+  const remainder = pick(rng, 1, divisor - 1)
+  const dividend = divisor * quotient + remainder
+  return problem(
+    'm-div-remainder',
+    `${dividend} ÷ ${divisor}`,
+    { kind: 'parts', parts: [quotient, remainder], separator: 'r' },
+    [dividend, divisor],
+  )
+}
+
+/**
  * Long multiplication and division, asked answer-only.
  *
  * Caveat worth knowing: the lesson in these skills is the WRITTEN METHOD, and

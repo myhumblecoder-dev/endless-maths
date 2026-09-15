@@ -6,7 +6,7 @@
  * Deliberately excluded — see docs/design.md § Implementation tiers:
  *  - the rest of the fractions strand (adding, subtracting, multiplying, dividing)
  *  - collecting like terms, expanding brackets, inequalities (expression engine)
- *  - counting to 20, factors/multiples, ratios, remainders (other input widgets)
+ *  - counting to 20, factors and multiples, ratios (other input widgets)
  */
 
 import type { Generator, Problem, Rng, SkillId } from '@/lib/curriculum/types'
@@ -43,6 +43,7 @@ export const GENERATORS = {
   'm-div-3-4': md.mDiv34,
   'm-div-6-7-8-9': md.mDiv6789,
   'm-2digit-x-1digit': md.m2DigitBy1Digit,
+  'm-div-remainder': md.mDivRemainder,
   'm-long-mult': md.mLongMult,
   'm-long-div': md.mLongDiv,
 

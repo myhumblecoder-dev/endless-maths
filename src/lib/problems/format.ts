@@ -18,6 +18,8 @@ export function formatAnswer(answer: Answer): string {
     }
     case 'mixed':
       return `${answer.whole} ${answer.num}/${answer.den}`
+    case 'parts':
+      return answer.parts.join(` ${answer.separator} `)
     default:
       return ''
   }

@@ -7,7 +7,7 @@
  */
 
 import type { Answer, Verdict } from '@/lib/curriculum/types'
-import { isSimplified, parseFraction, sameValue } from './fraction'
+import { isSimplified, parseFraction, sameValue, simplify } from './fraction'
 
 export function check(expected: Answer, given: string): Verdict {
   const raw = given.trim()
@@ -51,6 +51,29 @@ export function check(expected: Answer, given: string): Verdict {
       // Right value. Lowest terms is the rest of the skill — see
       // docs/design.md, "Simplifying is part of the skill".
       return isSimplified(given.num, given.den) ? 'correct' : 'equivalent-unsimplified'
+    }
+
+    case 'parts': {
+      const parts = raw.split(expected.separator).map((s) => s.trim())
+      if (parts.length !== expected.parts.length) return 'incorrect'
+      if (!parts.every((s) => /^\d+$/.test(s))) return 'incorrect'
+
+      const given = parts.map(Number)
+      if (given.every((n, i) => n === expected.parts[i])) return 'correct'
+
+      /**
+       * A ratio has a right value in the wrong form, exactly like a fraction —
+       * "4 : 6" is 2 : 3 unsimplified. A remainder does not: "14 r 4" is simply
+       * a different answer from "7 r 2", even though 14:4 reduces to 7:2.
+       */
+      if (expected.separator === ':' && given.length === 2) {
+        const reduced = simplify(given[0], given[1])
+        if (reduced.num === expected.parts[0] && reduced.den === expected.parts[1]) {
+          return 'equivalent-unsimplified'
+        }
+      }
+
+      return 'incorrect'
     }
 
     default:
