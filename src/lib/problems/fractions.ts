@@ -1,6 +1,6 @@
 import type { Generator, Rng } from '@/lib/curriculum/types'
 import { pick, pickFrom, until } from './rng'
-import { choice, int, problem } from './build'
+import { choice, dec, int, problem } from './build'
 import { gcd, simplify } from './fraction'
 
 /**
@@ -167,4 +167,86 @@ export const fAddUnlike: Generator = (rng: Rng) => {
     { kind: 'fraction', num: answer.num, den: answer.den },
     [a, d1, b, d2],
   )
+}
+
+/**
+ * Multiplying and dividing fractions.
+ *
+ * Both pose their operands in lowest terms, as a textbook would, and both give
+ * a simplified answer. Division may land on a whole number or an improper
+ * fraction — that is honest to the maths, and `formatAnswer` writes a
+ * denominator of 1 as a plain whole number.
+ */
+export const fMultiply: Generator = (rng: Rng) => {
+  const first = properSimplified(rng)
+  const second = properSimplified(rng)
+  const answer = simplify(first.num * second.num, first.den * second.den)
+  return problem(
+    'f-multiply',
+    `${first.num}/${first.den} × ${second.num}/${second.den}`,
+    { kind: 'fraction', num: answer.num, den: answer.den },
+    [first.num, first.den, second.num, second.den],
+  )
+}
+
+export const fDivide: Generator = (rng: Rng) => {
+  const first = properSimplified(rng)
+  const second = properSimplified(rng)
+  // Dividing by b/d is multiplying by d/b.
+  const answer = simplify(first.num * second.den, first.den * second.num)
+  return problem(
+    'f-divide',
+    `${first.num}/${first.den} ÷ ${second.num}/${second.den}`,
+    { kind: 'fraction', num: answer.num, den: answer.den },
+    [first.num, first.den, second.num, second.den],
+  )
+}
+
+/**
+ * Converting between fractions, decimals and percentages, in all four
+ * directions — which is why this skill declares several answer kinds.
+ *
+ * Denominators are restricted to those dividing 100, so every conversion
+ * terminates exactly and every percentage is a whole number. A recurring
+ * decimal has no exact form to type, and asking for one would be unanswerable.
+ */
+const CONVERTIBLE_DENOMINATORS = [2, 4, 5, 10, 20, 25, 50] as const
+
+export const fConvertFdp: Generator = (rng: Rng) => {
+  const { num, den } = until(
+    () => {
+      const den = pickFrom(rng, CONVERTIBLE_DENOMINATORS)
+      return { num: pick(rng, 1, den - 1), den }
+    },
+    ({ num, den }) => gcd(num, den) === 1,
+  )
+
+  const hundredths = (num * 100) / den // exact: every denominator divides 100
+  // 0.5, not 0.50 — nobody writes the trailing zero, and in a prompt it also
+  // quietly hints at the shape of the answer.
+  const places = hundredths % 10 === 0 ? 1 : 2
+  const asDecimal = (hundredths / 100).toFixed(places)
+  const direction = pickFrom(rng, ['decimal', 'percent', 'fromDecimal', 'fromPercent'] as const)
+  const operands = [num, den]
+
+  switch (direction) {
+    case 'decimal':
+      return problem('f-convert-fdp', `Write ${num}/${den} as a decimal`, dec(hundredths / (places === 1 ? 10 : 1), places), operands)
+    case 'percent':
+      return problem('f-convert-fdp', `Write ${num}/${den} as a percentage`, int(hundredths), operands)
+    case 'fromDecimal':
+      return problem(
+        'f-convert-fdp',
+        `Write ${asDecimal} as a fraction`,
+        { kind: 'fraction', num, den },
+        operands,
+      )
+    default:
+      return problem(
+        'f-convert-fdp',
+        `Write ${hundredths}% as a fraction`,
+        { kind: 'fraction', num, den },
+        operands,
+      )
+  }
 }

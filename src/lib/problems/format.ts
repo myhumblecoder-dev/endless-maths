@@ -11,8 +11,11 @@ export function formatAnswer(answer: Answer): string {
       return answer.value.toFixed(answer.dp)
     case 'choice':
       return answer.value
-    case 'fraction':
-      return answer.num < 0 ? `−${Math.abs(answer.num)}/${answer.den}` : `${answer.num}/${answer.den}`
+    case 'fraction': {
+      // A denominator of 1 is a whole number; "2/1" is not how anyone writes two.
+      const body = answer.den === 1 ? `${Math.abs(answer.num)}` : `${Math.abs(answer.num)}/${answer.den}`
+      return answer.num < 0 ? `−${body}` : body
+    }
     case 'mixed':
       return `${answer.whole} ${answer.num}/${answer.den}`
     default:

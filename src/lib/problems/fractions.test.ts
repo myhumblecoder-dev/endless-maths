@@ -2,7 +2,8 @@ import { test } from 'vitest'
 import assert from 'node:assert/strict'
 import { generate, seeded } from './index'
 import { check } from './check'
-import { gcd, isSimplified, parseFraction } from './fraction'
+import { gcd, isSimplified, parseFraction, simplify as simplifyPair } from './fraction'
+import { formatAnswer } from './format'
 
 const draws = (skill: Parameters<typeof generate>[0], n = 800) => {
   const rng = seeded(4242)
@@ -247,5 +248,140 @@ test('unlike questions pose their addends in lowest terms', () => {
     const [, a, d1, b, d2] = p.prompt.match(/^(\d+)\/(\d+) \+ (\d+)\/(\d+)$/)!.map(Number)
     assert.ok(isSimplified(a, d1), `${p.prompt}: ${a}/${d1} should be simplified`)
     assert.ok(isSimplified(b, d2), `${p.prompt}: ${b}/${d2} should be simplified`)
+  }
+})
+
+// ---- f-multiply / f-divide ------------------------------------------------
+
+const opSkills = ['f-multiply', 'f-divide'] as const
+
+test('multiplying and dividing pose simplified fractions and answer in lowest terms', () => {
+  for (const skill of opSkills) {
+    for (const p of draws(skill)) {
+      const [, a, d1, b, d2] = p.prompt.match(/^(\d+)\/(\d+) [×÷] (\d+)\/(\d+)$/)!.map(Number)
+      assert.ok(isSimplified(a, d1), `${skill}: ${p.prompt} poses ${a}/${d1}`)
+      assert.ok(isSimplified(b, d2), `${skill}: ${p.prompt} poses ${b}/${d2}`)
+      assert.ok(p.answer.kind === 'fraction')
+      if (p.answer.kind !== 'fraction') continue
+      assert.ok(isSimplified(p.answer.num, p.answer.den), `${skill}: ${p.prompt} -> not in lowest terms`)
+      assert.ok(p.answer.num > 0)
+    }
+  }
+})
+
+test('the stated product is right', () => {
+  for (const p of draws('f-multiply')) {
+    const [, a, d1, b, d2] = p.prompt.match(/^(\d+)\/(\d+) × (\d+)\/(\d+)$/)!.map(Number)
+    assert.ok(p.answer.kind === 'fraction')
+    assert.equal(a * b * p.answer.den, p.answer.num * (d1 * d2), p.prompt)
+  }
+})
+
+test('the stated quotient is right', () => {
+  for (const p of draws('f-divide')) {
+    const [, a, d1, b, d2] = p.prompt.match(/^(\d+)\/(\d+) ÷ (\d+)\/(\d+)$/)!.map(Number)
+    assert.ok(p.answer.kind === 'fraction')
+    // a/d1 ÷ b/d2 === (a*d2)/(d1*b)
+    assert.equal(a * d2 * p.answer.den, p.answer.num * (d1 * b), p.prompt)
+  }
+})
+
+/** Multiplying denominators instead of cross-multiplying is the division slip. */
+test('forgetting to flip the divisor grades incorrect', () => {
+  for (const p of draws('f-divide', 200)) {
+    const [, a, d1, b, d2] = p.prompt.match(/^(\d+)\/(\d+) ÷ (\d+)\/(\d+)$/)!.map(Number)
+    if (a * b === 0) continue
+    const slip = simplifyPair(a * b, d1 * d2)
+    assert.ok(p.answer.kind === 'fraction')
+    // Only meaningful when the slip differs from the right answer.
+    if (slip.num === p.answer.num && slip.den === p.answer.den) continue
+    assert.equal(check(p.answer, `${slip.num}/${slip.den}`), 'incorrect', p.prompt)
+  }
+})
+
+test('a whole-number answer is shown as a whole number', () => {
+  // "2/1" is not how anyone writes two.
+  assert.equal(formatAnswer({ kind: 'fraction', num: 2, den: 1 }), '2')
+  assert.equal(check({ kind: 'fraction', num: 2, den: 1 }, '2'), 'correct')
+})
+
+test('multiplying and dividing have enough distinct problems', () => {
+  for (const skill of opSkills) {
+    const distinct = new Set(draws(skill, 2000).map((p) => p.prompt)).size
+    assert.ok(distinct >= 25, `${skill} produces only ${distinct} distinct problems`)
+  }
+})
+
+// ---- f-convert-fdp --------------------------------------------------------
+
+test('converting covers all four directions', () => {
+  /** Direction is the pair (what is given, what is asked for). */
+  const direction = (prompt: string) => {
+    const given = /%/.test(prompt) ? 'percent' : /\d\.\d/.test(prompt) ? 'decimal' : 'fraction'
+    const wanted = prompt.match(/as a (\w+)/)![1]
+    return `${given}->${wanted}`
+  }
+  const seen = new Set(draws('f-convert-fdp').map((p) => direction(p.prompt)))
+  assert.deepEqual(
+    [...seen].sort(),
+    ['decimal->fraction', 'fraction->decimal', 'fraction->percentage', 'percent->fraction'],
+  )
+})
+
+test('every conversion terminates exactly', () => {
+  for (const p of draws('f-convert-fdp')) {
+    if (p.answer.kind === 'decimal') {
+      const scaled = p.answer.value * 10 ** p.answer.dp
+      assert.ok(Math.abs(scaled - Math.round(scaled)) < 1e-9, `${p.prompt} -> ${p.answer.value} is not exact`)
+    }
+    if (p.answer.kind === 'integer') {
+      assert.ok(Number.isInteger(p.answer.value), `${p.prompt} -> ${p.answer.value} is not whole`)
+    }
+    if (p.answer.kind === 'fraction') {
+      assert.ok(isSimplified(p.answer.num, p.answer.den), `${p.prompt} -> not in lowest terms`)
+    }
+  }
+})
+
+test('the conversion is arithmetically right', () => {
+  for (const p of draws('f-convert-fdp')) {
+    const [num, den] = p.operands
+    if (p.answer.kind === 'decimal') {
+      assert.ok(Math.abs(p.answer.value - num / den) < 1e-9, `${p.prompt} -> ${p.answer.value}`)
+    } else if (p.answer.kind === 'integer') {
+      assert.equal(p.answer.value, (num * 100) / den, p.prompt)
+    } else if (p.answer.kind === 'fraction') {
+      assert.equal(p.answer.num * den, num * p.answer.den, p.prompt)
+    }
+  }
+})
+
+test('each conversion answer grades correct as typed', () => {
+  for (const p of draws('f-convert-fdp', 400)) {
+    const typed =
+      p.answer.kind === 'decimal' ? String(p.answer.value)
+      : p.answer.kind === 'integer' ? String(p.answer.value)
+      : p.answer.kind === 'fraction' ? `${p.answer.num}/${p.answer.den}`
+      : ''
+    assert.equal(check(p.answer, typed), 'correct', `${p.prompt} typed "${typed}"`)
+  }
+})
+
+test('a skill may declare more than one answer kind', () => {
+  // f-convert-fdp genuinely has several: "as a decimal" gives a decimal, "as a
+  // percentage" a whole number, "as a fraction" a fraction.
+  const kinds = new Set(draws('f-convert-fdp').map((p) => p.answer.kind))
+  assert.ok(kinds.size >= 3, `expected several answer kinds, saw ${[...kinds].join(', ')}`)
+})
+
+test('decimals are written the way a person writes them', () => {
+  // "0.20" and "0.50" are not wrong, but nobody writes them. Trailing zeros in
+  // a prompt also hint at the answer's shape, which is its own small problem.
+  for (const p of draws('f-convert-fdp')) {
+    const shown = p.prompt.match(/([\d]+\.[\d]+)/)?.[1]
+    if (shown) assert.doesNotMatch(shown, /0$/, `prompt shows "${shown}"`)
+    if (p.answer.kind === 'decimal') {
+      assert.doesNotMatch(formatAnswer(p.answer), /\.\d*0$/, `answer shows "${formatAnswer(p.answer)}"`)
+    }
   }
 })
