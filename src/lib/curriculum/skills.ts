@@ -45,8 +45,8 @@ export const SKILLS: Skill[] = [
 
   // ---- fractions, decimals, percentages -----------------------------------
   { id: 'f-identify', strand: 'fractions', kind: 'procedure', label: 'What is a fraction?', requires: ['m-div-2-5-10'], answerKind: 'fraction', typicalAge: [7, 9] },
-  { id: 'f-equivalent', strand: 'fractions', kind: 'procedure', label: 'Equivalent fractions', requires: ['f-identify', 'm-times-3-4'], answerKind: 'fraction', typicalAge: [8, 10] },
-  { id: 'f-compare', strand: 'fractions', kind: 'procedure', label: 'Comparing fractions', requires: ['f-equivalent'], answerKind: 'fraction', typicalAge: [9, 10] },
+  { id: 'f-equivalent', strand: 'fractions', kind: 'procedure', label: 'Equivalent fractions', requires: ['f-identify', 'm-times-3-4'], answerKind: 'integer', typicalAge: [8, 10] },
+  { id: 'f-compare', strand: 'fractions', kind: 'procedure', label: 'Comparing fractions', requires: ['f-equivalent'], answerKind: 'choice', typicalAge: [9, 10] },
   { id: 'f-add-like', strand: 'fractions', kind: 'procedure', label: 'Adding fractions, same denominator', requires: ['f-identify'], answerKind: 'fraction', typicalAge: [8, 10] },
   { id: 'f-sub-like', strand: 'fractions', kind: 'procedure', label: 'Subtracting fractions, same denominator', requires: ['f-add-like'], answerKind: 'fraction', typicalAge: [8, 10] },
   { id: 'f-add-unlike', strand: 'fractions', kind: 'procedure', label: 'Adding fractions, different denominators', requires: ['f-add-like', 'f-equivalent', 'r-factors-multiples'], answerKind: 'fraction', typicalAge: [10, 12] },
