@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Keypad } from './Keypad'
 import { Maths } from './Maths'
 import { SESSION_LENGTH, answer as submitAnswer, completesProblem, currentProblem, isComplete, startSession, summary, type Session } from '@/lib/session/session'
-import { canSubmit as entryCanSubmit, isEntryKey, press } from '@/lib/session/keypad'
+import { canSubmit as entryCanSubmit, choiceForKey, isEntryKey, press } from '@/lib/session/keypad'
 import type { Verdict } from '@/lib/curriculum/types'
 import { feedbackText, formatAnswer } from '@/lib/problems/format'
 import { seeded } from '@/lib/problems'
@@ -140,13 +140,24 @@ export function Practice({ skill, progress, onProgress, onLeave, onPickSkill, se
         return
       }
 
+      // Leaving should never need a mouse.
+      if (e.key === 'Escape') return onLeave()
+
+      /**
+       * A choice is tapped, not typed — but on a laptop there is nothing to
+       * tap. A symbol option is pressed directly, a word option by its first
+       * letter, so "<" and "y" answer without reaching for the trackpad.
+       */
+      const choice = choiceForKey(e.key, problem.answer)
+      if (choice) return commit(choice)
+
       if (isEntryKey(e.key, problem.answer)) setEntry((v) => press(v, e.key, problem.answer))
       else if (e.key === 'Backspace') setEntry((v) => press(v, 'back', problem.answer))
       else if (e.key === 'Enter' && entryCanSubmit(entry, problem.answer)) commit(entry)
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [feedback, problem, commit, advance, entry])
+  }, [feedback, problem, commit, advance, entry, onLeave])
 
   const stats = useMemo(() => (session ? summary(session) : null), [session])
 
@@ -261,7 +272,12 @@ export function Practice({ skill, progress, onProgress, onLeave, onPickSkill, se
       </div>
 
       <div className="flex flex-1 flex-col justify-center gap-6">
-        <p className="text-center text-4xl font-bold tracking-tight text-slate-900 dark:text-slate-50 sm:text-5xl">
+        <p
+          // Announced on change, so a screen-reader user hears the next
+          // question without hunting for it.
+          aria-live="polite"
+          className="text-center text-4xl font-bold tracking-tight text-slate-900 dark:text-slate-50 sm:text-5xl"
+        >
           <Maths text={problem.prompt} />
         </p>
 
