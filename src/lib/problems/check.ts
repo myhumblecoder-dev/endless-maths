@@ -60,9 +60,15 @@ export function check(expected: Answer, given: string): Verdict {
      * either equivalent or it is not.
      */
     case 'expression': {
+      const want = normalise(expected.canonical)
+      if (!want) {
+        // Comparing against an unparseable canonical would return false for
+        // every input, including the right one — silently marking correct
+        // answers wrong. Fail loudly instead.
+        throw new Error(`check(): expected canonical '${expected.canonical}' does not parse`)
+      }
       const given = normalise(raw)
-      if (!given) return 'incorrect'
-      return given === normalise(expected.canonical) ? 'correct' : 'incorrect'
+      return given === want ? 'correct' : 'incorrect'
     }
 
     case 'parts': {

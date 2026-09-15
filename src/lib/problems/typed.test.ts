@@ -6,9 +6,9 @@ import { canSubmit, press } from '@/lib/session/keypad'
 import type { Answer } from '@/lib/curriculum/types'
 
 /** Build an entry the way the keypad actually does: one press at a time. */
-function typeIn(text: string): string {
+function typeIn(text: string, answer: Answer): string {
   let entry = ''
-  for (const ch of text) entry = press(entry, ch === '-' || ch === '−' ? '-' : ch)
+  for (const ch of text) entry = press(entry, ch === '-' || ch === '−' ? '-' : ch, answer)
   return entry
 }
 
@@ -53,12 +53,12 @@ test('every answer a person can type is graded correct', () => {
           if (check(p.answer, text) !== 'correct') failures.push(`${skill}: "${p.prompt}" -> "${text}"`)
           continue
         }
-        const entry = typeIn(text)
+        const entry = typeIn(text, p.answer)
         if (entry !== text) {
           failures.push(`${skill}: "${p.prompt}" typing "${text}" produced "${entry}"`)
           continue
         }
-        if (!canSubmit(entry)) {
+        if (!canSubmit(entry, p.answer)) {
           failures.push(`${skill}: "${p.prompt}" cannot submit "${entry}"`)
           continue
         }

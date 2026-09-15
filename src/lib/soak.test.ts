@@ -4,6 +4,7 @@ import { startPlacement, currentProbe, answerProbe, isPlacementComplete, placeme
 import { startSession, currentProblem, answer, isComplete, summary } from './session/session'
 import { unlockedSkills } from './session/scheduler'
 import { canSubmit, press } from './session/keypad'
+import type { Answer } from './curriculum/types'
 import { emptyProgress, record } from './mastery/mastery'
 import { loadProgress, saveProgress, type KeyValueStore } from './mastery/storage'
 import { seeded, generate, IMPLEMENTED } from './problems'
@@ -24,9 +25,9 @@ const store = (): KeyValueStore => {
 }
 
 /** Build an entry the way the keypad does, one press at a time. */
-function typeIn(text: string): string {
+function typeIn(text: string, answer: Answer): string {
   let entry = ''
-  for (const ch of text) entry = press(entry, ch === '−' ? '-' : ch)
+  for (const ch of text) entry = press(entry, ch === '−' ? '-' : ch, answer)
   return entry
 }
 
@@ -75,8 +76,8 @@ test('a full session plays to the end from any placement', () => {
       assert.ok(problem, `seed ${seed}: no problem before completion`)
       // Half right, half nonsense — a real child does both.
       const text = rng() < 0.5 ? formatAnswer(problem.answer) : String(Math.floor(rng() * 1000))
-      const entry = typeIn(text)
-      session = answer(session, canSubmit(entry) ? entry : '', Math.floor(rng() * 20000), seed * 1000)
+      const entry = typeIn(text, problem.answer)
+      session = answer(session, canSubmit(entry, problem.answer) ? entry : '', Math.floor(rng() * 20000), seed * 1000)
     }
 
     const s = summary(session)

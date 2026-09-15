@@ -1,50 +1,78 @@
 /**
- * What the child has typed so far, and what a key press does to it.
+ * What the learner has typed so far, and what a key press does to it.
  *
- * Pure string-in, string-out, so the keypad rules are testable without a DOM
- * and the component stays a rendering concern.
+ * Every function here takes the expected `Answer`, because the rules genuinely
+ * differ by kind and a context-free version is dangerous: `x` is the unknown in
+ * an expression and meaningless in a times-tables answer, and a minus after a
+ * digit is an operator in one and a stranded keystroke in the other.
+ *
+ * That was not hypothetical. Before the answer was passed in, a child could
+ * type `56` for `7 × 8`, press `x` for "times", and submit `"56x"` — graded
+ * incorrect for a correct answer, which is the one failure this app cannot
+ * afford.
  */
 
+import type { Answer } from '@/lib/curriculum/types'
 import { normalise } from '@/lib/problems/expression'
 
 export type Entry = string
 
 export type Key = 'back' | 'clear' | '-' | '+' | '.' | '/' | 'r' | ':' | 'x' | string
 
-/** Does the entry already carry a multi-part separator? */
-const hasSeparator = (entry: Entry): boolean => /[r:]/.test(entry)
-
-/** Ten characters is already more than any Tier 1 answer needs. */
+/** Ten characters is more than any answer we ask for needs. */
 const MAX_LENGTH = 10
 
-export function press(entry: Entry, key: Key): Entry {
+const isExpression = (answer: Answer) => answer.kind === 'expression'
+const isFraction = (answer: Answer) => answer.kind === 'fraction' || answer.kind === 'mixed'
+const separatorFor = (answer: Answer) => (answer.kind === 'parts' ? answer.separator : undefined)
+
+/** Does this key contribute to an answer of this kind? */
+export function isEntryKey(key: string, answer: Answer): boolean {
+  if (answer.kind === 'choice') return false
+  if (/^[0-9]$/.test(key)) return true
+
   switch (key) {
-    case 'back':
-      return entry.slice(0, -1)
+    case '-':
+      // A sign for anything numeric; also an operator in an expression.
+      return answer.kind !== 'parts' && !isFraction(answer)
+    case '.':
+      return answer.kind === 'decimal'
+    case '/':
+      return isFraction(answer)
+    case 'r':
+    case ':':
+      return separatorFor(answer) === key
+    case 'x':
+    case '+':
+      return isExpression(answer)
+    default:
+      return false
+  }
+}
 
-    case 'clear':
-      return ''
+export function press(entry: Entry, key: Key, answer: Answer): Entry {
+  if (key === 'back') return entry.slice(0, -1)
+  if (key === 'clear') return ''
 
+  // A key that means nothing for this answer changes nothing.
+  if (!isEntryKey(key, answer)) return entry
+  if (entry.length >= MAX_LENGTH) return entry
+
+  switch (key) {
     /**
-     * A minus is two different things: the sign at the very front of a number,
-     * and the operator between two terms of an expression. Both are allowed;
-     * two in a row are not.
+     * At the front it is a sign. After a term it is an operator, which only
+     * makes sense in an expression — elsewhere it would strand the entry in a
+     * state that cannot be submitted.
      */
     case '-':
       if (entry === '') return '-'
-      // Never inside a fraction or a multi-part answer — those have no
-      // subtraction in them, so a minus there can only be a mistake.
-      if (entry.includes('/') || hasSeparator(entry)) return entry
-      return /[\dx]$/.test(entry) ? `${entry}-` : entry
+      return isExpression(answer) && /[\dx]$/.test(entry) ? `${entry}-` : entry
 
     /** Only ever an operator, so it needs something to act on. */
     case '+':
       return /[\dx]$/.test(entry) ? `${entry}+` : entry
 
-    /**
-     * The unknown. Follows a coefficient or stands alone, but a term carries
-     * at most one — "7xx" is not an expression.
-     */
+    /** A term carries at most one unknown: "7xx" is not an expression. */
     case 'x': {
       const lastTerm = entry.split(/[+-]/).pop() ?? ''
       return lastTerm.includes('x') ? entry : `${entry}x`
@@ -52,65 +80,48 @@ export function press(entry: Entry, key: Key): Entry {
 
     // Children write `.5`; show them `0.5` rather than correcting them later.
     case '.':
-      if (entry.includes('.') || entry.includes('/')) return entry
+      if (entry.includes('.')) return entry
       return entry === '' || entry === '-' ? `${entry}0.` : `${entry}.`
 
     /**
      * A fraction is held as one string — "3/4" — so parseFraction, check and
-     * every existing test work unchanged, and the two-box display is just a
-     * rendering of it. Needs a numerator first, allows only one slash, and does
-     * not mix with a decimal point.
+     * every existing test work on ordinary text, and the stacked display is a
+     * rendering of it.
      */
-    case '/': {
-      if (entry.includes('/') || entry.includes('.') || hasSeparator(entry)) return entry
-      return /\d$/.test(entry) ? `${entry}/` : entry
-    }
+    case '/':
+      return !entry.includes('/') && /\d$/.test(entry) ? `${entry}/` : entry
 
-    /**
-     * The separator between a quotient and its remainder, or the two sides of a
-     * ratio. Same rules as the slash: a number has to come first, it appears
-     * once, and it does not mix with a fraction or a decimal.
-     */
+    /** The join between a quotient and its remainder, or two sides of a ratio. */
     case 'r':
-    case ':': {
-      if (hasSeparator(entry) || entry.includes('/') || entry.includes('.')) return entry
+    case ':':
+      if (/[r:]/.test(entry) || entry.includes('/') || entry.includes('.')) return entry
       return /\d$/.test(entry) ? `${entry}${key}` : entry
-    }
 
     default:
-      return entry.length >= MAX_LENGTH ? entry : entry + key
+      return entry + key
   }
 }
 
 /**
- * True when the entry is a complete answer. `-` and `3.` are mid-typing, not
- * answers — submitting them would be graded wrong for no reason.
+ * Is this a complete answer? Mid-typing states — `3/`, `7r`, `5-`, `x+` — are
+ * not, and must not be submittable: a half-written answer grades as wrong.
  */
-export function canSubmit(entry: Entry): boolean {
+export function canSubmit(entry: Entry, answer: Answer): boolean {
   if (entry === '') return false
-  // An expression is submittable exactly when it parses.
-  if (/[x+]/.test(entry)) return normalise(entry) !== undefined
-  // Both halves of a multi-part answer are needed; "7r" is mid-typing.
-  if (hasSeparator(entry)) return /^\d+[r:]\d+$/.test(entry)
-  // A fraction needs both halves. "3/" is mid-typing, not an answer.
-  if (entry.includes('/')) return /^-?\d+\/\d+$/.test(entry)
-  if (/^-?\d*\.?\d*$/.test(entry)) return /\d$/.test(entry)
-  /**
-   * What is left should be a choice value — 'yes', '<'. Anything carrying a
-   * digit or an arithmetic character got here by being a malformed number, and
-   * must not fall through as though it were a tapped choice.
-   */
-  return !/[\d.\-]/.test(entry)
-}
 
-/**
- * Does this physical key contribute to the answer?
- *
- * Used to spot typing-ahead: a key arriving while feedback is on screen means
- * the learner has moved on, so the feedback should be skipped rather than the
- * keystroke swallowed. Swallowing it truncates their next answer — 12 becomes
- * 2 — and marks a correct answer wrong.
- */
-export function isEntryKey(key: string): boolean {
-  return /^[0-9]$/.test(key) || ['-', '.', '/', 'r', ':', 'x', '+'].includes(key)
+  switch (answer.kind) {
+    case 'choice':
+      return true
+    case 'expression':
+      return normalise(entry) !== undefined
+    case 'fraction':
+    case 'mixed':
+      return /^-?\d+\/\d+$/.test(entry)
+    case 'parts':
+      return new RegExp(`^\\d+${answer.separator}\\d+$`).test(entry)
+    case 'decimal':
+    case 'integer':
+    default:
+      return /^-?\d*\.?\d*$/.test(entry) && /\d$/.test(entry)
+  }
 }

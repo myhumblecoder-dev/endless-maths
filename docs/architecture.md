@@ -77,7 +77,10 @@ would make extracting an engine package a directory move rather than a refactor.
   and the session mix interleaves review with the chosen skill.
 - **`diagnose.ts`** — `isStruggling()`, `gapBehind()`. Finds the weak foundation
   under a skill someone keeps failing.
-- **`keypad.ts`** — `press()`, `canSubmit()`, `isEntryKey()`. Pure input rules.
+- **`keypad.ts`** — `press()`, `canSubmit()`, `isEntryKey()`. Pure input rules,
+  each taking the expected `Answer`: the rules genuinely differ by kind, and a
+  context-free version let `x` into a times-tables answer and graded a correct
+  one wrong.
 
 ### `lib/placement/`
 - **`placement.ts`** — the level-check state machine.
@@ -107,6 +110,9 @@ produced a real bug.
    a teacher can hand one set to a class.
 7. **Components render; `lib/` decides.** Any rule that can be stated without a
    DOM belongs below the component layer.
+8. **Input rules take the expected answer.** What a key means depends on what is
+   being asked for. A context-free keypad accepted `x` during a times table,
+   so `56` + `x` submitted as `"56x"` and graded wrong.
 
 ## Testing strategy
 
