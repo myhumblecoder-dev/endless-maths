@@ -4,7 +4,7 @@
  * sides of an equation.
  *
  * Deliberately excluded — see docs/design.md § Implementation tiers:
- *  - the fractions strand (needs a fraction type, equivalence, stacked rendering)
+ *  - the rest of the fractions strand (adding, subtracting, multiplying, dividing)
  *  - collecting like terms, expanding brackets, inequalities (expression engine)
  *  - counting to 20, factors/multiples, ratios, remainders (other input widgets)
  */
@@ -15,6 +15,7 @@ import * as as from './addSub'
 import * as md from './mulDiv'
 import * as rn from './ratioNegatives'
 import * as dc from './decimals'
+import * as fr from './fractions'
 import * as pa from './preAlgebra'
 
 export const GENERATORS = {
@@ -52,6 +53,15 @@ export const GENERATORS = {
   'r-negative-mul-div': rn.rNegativeMulDiv,
   'r-proportion': rn.rProportion,
 
+  'f-identify': fr.fIdentify,
+  'f-equivalent': fr.fEquivalent,
+  'f-compare': fr.fCompare,
+  'f-add-like': fr.fAddLike,
+  'f-sub-like': fr.fSubLike,
+  'f-add-unlike': fr.fAddUnlike,
+  'f-multiply': fr.fMultiply,
+  'f-divide': fr.fDivide,
+  'f-convert-fdp': fr.fConvertFdp,
   'f-percent-of': dc.fPercentOf,
   'f-decimal-place-value': dc.fDecimalPlaceValue,
   'f-decimal-add-sub': dc.fDecimalAddSub,

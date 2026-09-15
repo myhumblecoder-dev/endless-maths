@@ -56,11 +56,59 @@ test('choice answers submit as themselves', () => {
 
 // ---- typing ahead ---------------------------------------------------------
 
-test('digits, minus and decimal point are entry keys', () => {
-  for (const k of ['0', '5', '9', '-', '.']) assert.equal(isEntryKey(k), true, `${k} should be an entry key`)
+test('digits, minus, decimal point and slash are entry keys', () => {
+  for (const k of ['0', '5', '9', '-', '.', '/']) {
+    assert.equal(isEntryKey(k), true, `${k} should be an entry key`)
+  }
 })
 
 test('control and navigation keys are not entry keys', () => {
   for (const k of ['Enter', 'Backspace', 'Shift', 'Tab', 'ArrowLeft', 'a', 'F5'])
     assert.equal(isEntryKey(k), false, `${k} should not be an entry key`)
+})
+
+// ---- fractions ------------------------------------------------------------
+// A fraction is entered as one string, "3/4", so everything downstream —
+// parseFraction, check, the soak tests — works unchanged.
+
+test('the divide key starts a denominator', () => {
+  assert.equal(press('3', '/'), '3/')
+  assert.equal(press('12', '/'), '12/')
+})
+
+test('a fraction cannot start with a slash', () => {
+  assert.equal(press('', '/'), '', 'there is nothing to divide yet')
+  assert.equal(press('-', '/'), '-')
+})
+
+test('there is only one slash', () => {
+  assert.equal(press('3/', '/'), '3/')
+  assert.equal(press('3/4', '/'), '3/4')
+})
+
+test('a denominator takes digits', () => {
+  assert.equal(press('3/', '4'), '3/4')
+  assert.equal(press('3/1', '2'), '3/12')
+})
+
+test('backspace walks back out of the denominator', () => {
+  assert.equal(press('3/4', 'back'), '3/')
+  assert.equal(press('3/', 'back'), '3')
+})
+
+test('a minus still belongs only at the very front', () => {
+  assert.equal(press('3/4', '-'), '3/4', 'no minus in a denominator')
+})
+
+test('a half-typed fraction cannot be submitted', () => {
+  assert.equal(canSubmit('3/'), false, 'no denominator yet')
+  assert.equal(canSubmit('/4'), false)
+  assert.equal(canSubmit('3/4'), true)
+  assert.equal(canSubmit('-3/4'), true)
+  assert.equal(canSubmit('3/0'), true, 'gradeable, and check() marks it incorrect')
+})
+
+test('a decimal point and a slash do not mix', () => {
+  assert.equal(press('3.5', '/'), '3.5', 'a fraction of a decimal is not a thing here')
+  assert.equal(press('3/4', '.'), '3/4')
 })

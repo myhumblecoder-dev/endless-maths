@@ -1,6 +1,6 @@
 import { test } from 'vitest'
 import assert from 'node:assert/strict'
-import { startSession, currentProblem, answer, isComplete, summary, SESSION_LENGTH } from './session'
+import { startSession, currentProblem, answer, isComplete, summary, completesProblem, SESSION_LENGTH } from './session'
 import { unlockedSkills } from './scheduler'
 import { emptyProgress, record, type Progress } from '@/lib/mastery/mastery'
 import { seeded } from '@/lib/problems'
@@ -295,4 +295,12 @@ test('targeting due facts stays reproducible from the seed', () => {
   const run = () => startSession(progress, seeded(3), { skill: 'a-add-within-20', now: HOUR })
     .problems.map((p) => `${p.skill}:${p.prompt}`)
   assert.deepEqual(run(), run())
+})
+
+test('an unsimplified answer does not finish the problem', () => {
+  // The policy is "right, now simplify it" — so the learner stays on the
+  // question rather than being moved past a half-finished answer.
+  assert.equal(completesProblem('correct'), true)
+  assert.equal(completesProblem('incorrect'), true)
+  assert.equal(completesProblem('equivalent-unsimplified'), false)
 })

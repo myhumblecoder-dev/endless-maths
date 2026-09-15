@@ -2,8 +2,10 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Keypad } from './Keypad'
-import { SESSION_LENGTH, answer as submitAnswer, currentProblem, isComplete, startSession, summary, type Session } from '@/lib/session/session'
+import { Maths } from './Maths'
+import { SESSION_LENGTH, answer as submitAnswer, completesProblem, currentProblem, isComplete, startSession, summary, type Session } from '@/lib/session/session'
 import { canSubmit as entryCanSubmit, isEntryKey, press } from '@/lib/session/keypad'
+import type { Verdict } from '@/lib/curriculum/types'
 import { feedbackText, formatAnswer } from '@/lib/problems/format'
 import { seeded } from '@/lib/problems'
 import { SKILL_BY_ID } from '@/lib/curriculum/skills'
@@ -19,7 +21,7 @@ import type { ImplementedSkill } from '@/lib/problems'
 const FEEDBACK_CORRECT_MS = 700
 const FEEDBACK_WRONG_MS = 1500
 
-type Feedback = { correct: boolean; expected: string }
+type Feedback = { verdict: Verdict; expected: string }
 
 type Props = {
   skill: ImplementedSkill
@@ -55,10 +57,11 @@ export function Practice({ skill, progress, onProgress, onLeave, onPickSkill, se
       window.clearTimeout(timer.current)
       timer.current = null
     }
+    // `pending` is empty when the last answer did not finish the problem — an
+    // unsimplified fraction — in which case this just clears and lets them retry.
     const next = pending.current
-    if (!next) return
     pending.current = null
-    setSession(next)
+    if (next) setSession(next)
     setEntry('')
     setFeedback(null)
   }, [])
@@ -99,12 +102,20 @@ export function Practice({ skill, progress, onProgress, onLeave, onPickSkill, se
     const next = submitAnswer(session, given, Date.now() - shownAt.current, Date.now())
     const verdict = next.attempts[next.attempts.length - 1].verdict
 
-    const correct = verdict === 'correct'
-    setFeedback({ correct, expected: formatAnswer(problem.answer) })
-    onProgress(next.progress)
+    setFeedback({ verdict, expected: formatAnswer(problem.answer) })
 
+    // An unsimplified answer is right but unfinished, so it neither scores nor
+    // moves them on: the feedback clears and they answer the same question
+    // again. Nothing is recorded, because they have not finished it yet.
+    if (!completesProblem(verdict)) {
+      timer.current = window.setTimeout(advance, FEEDBACK_WRONG_MS)
+      return
+    }
+
+    onProgress(next.progress)
     pending.current = next
-    timer.current = window.setTimeout(advance, correct ? FEEDBACK_CORRECT_MS : FEEDBACK_WRONG_MS)
+    timer.current = window.setTimeout(
+      advance, verdict === 'correct' ? FEEDBACK_CORRECT_MS : FEEDBACK_WRONG_MS)
   }, [session, feedback, onProgress, advance])
 
   const onKey = useCallback((key: string) => {
@@ -249,22 +260,26 @@ export function Practice({ skill, progress, onProgress, onLeave, onPickSkill, se
 
       <div className="flex flex-1 flex-col justify-center gap-6">
         <p className="text-center text-4xl font-bold tracking-tight text-slate-900 dark:text-slate-50 sm:text-5xl">
-          {problem.prompt}
+          <Maths text={problem.prompt} />
         </p>
 
         <div
           aria-live="polite"
           className={`grid h-20 place-items-center rounded-2xl text-4xl font-bold transition-colors ${
-            feedback
-              ? feedback.correct
+            !feedback
+              ? 'bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-slate-50'
+              : feedback.verdict === 'correct'
                 ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400'
-                : 'bg-amber-50 text-amber-800 dark:bg-amber-950/50 dark:text-amber-400'
-              : 'bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-slate-50'
+                : feedback.verdict === 'equivalent-unsimplified'
+                  ? 'bg-sky-50 text-sky-700 dark:bg-sky-950/50 dark:text-sky-400'
+                  : 'bg-amber-50 text-amber-800 dark:bg-amber-950/50 dark:text-amber-400'
           }`}
         >
           {feedback
-            ? feedbackText(feedback.correct, feedback.expected)
-            : entry || <span className="text-slate-300 dark:text-slate-600">?</span>}
+            ? <Maths text={feedbackText(feedback.verdict, feedback.expected)} />
+            : entry
+              ? <Maths text={entry} />
+              : <span className="text-slate-300 dark:text-slate-600">?</span>}
         </div>
       </div>
 
