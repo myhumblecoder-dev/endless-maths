@@ -5,7 +5,6 @@
  *
  * Deliberately excluded — see docs/design.md § Implementation tiers:
  *  - the rest of the fractions strand (adding, subtracting, multiplying, dividing)
- *  - collecting like terms, expanding brackets, inequalities (expression engine)
  *  - counting to 20 (needs a visual counting interface)
  */
 
@@ -73,6 +72,7 @@ export const GENERATORS = {
   'p-evaluate': pa.pEvaluate,
   'p-like-terms': pa.pLikeTerms,
   'p-distribute': pa.pDistribute,
+  'p-inequalities': pa.pInequalities,
   'p-solve-one-step': pa.pSolveOneStep,
   'p-solve-two-step': pa.pSolveTwoStep,
   'p-solve-both-sides': pa.pSolveBothSides,

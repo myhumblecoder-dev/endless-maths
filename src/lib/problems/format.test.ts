@@ -56,3 +56,24 @@ test('the existing two verdicts are unchanged', () => {
   assert.equal(feedbackText('correct', '8'), 'Correct')
   assert.equal(feedbackText('incorrect', '8'), 'Answer: 8')
 })
+
+// ---- expressions ----------------------------------------------------------
+
+test('an expression is spaced around its operators, not its signs', () => {
+  assert.equal(formatAnswer({ kind: 'expression', canonical: '5x+3' }), '5x + 3')
+  assert.equal(formatAnswer({ kind: 'expression', canonical: '5x-3' }), '5x − 3')
+  assert.equal(formatAnswer({ kind: 'expression', canonical: '-2x-4' }), '−2x − 4')
+  assert.equal(formatAnswer({ kind: 'expression', canonical: '7' }), '7')
+})
+
+test('a negative number keeps its sign attached', () => {
+  // "x< − 6" is what naive replacement produces, and it reads as an operator.
+  assert.equal(formatAnswer({ kind: 'expression', canonical: 'x<-6' }), 'x < −6')
+  assert.equal(formatAnswer({ kind: 'expression', canonical: '-6' }), '−6')
+})
+
+test('relations are written with their proper symbols', () => {
+  assert.equal(formatAnswer({ kind: 'expression', canonical: 'x>=7' }), 'x ≥ 7')
+  assert.equal(formatAnswer({ kind: 'expression', canonical: 'x<=7' }), 'x ≤ 7')
+  assert.equal(formatAnswer({ kind: 'expression', canonical: 'x>7' }), 'x > 7')
+})

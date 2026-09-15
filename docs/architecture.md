@@ -124,7 +124,7 @@ Four kinds, because each catches what the others cannot. All must pass:
 | **Property** | `problems/*.test.ts` | maths errors — every answer an integer, division exact, no ambiguous rounding, equations balance |
 | **Typed-path** | `problems/typed.test.ts` | answers a person can type but the keypad cannot produce, or grades wrong |
 | **Soak** | `lib/soak.test.ts` | crashes at volume — 195k generations, 300 placements, 150 full sessions, corrupt storage |
-| **Component** | `components/*.test.tsx` | UI wiring — every bug that reached a real user lived here |
+| **Component** | `components/*.test.tsx` | UI wiring — every bug that reached a real user lived here, including which keys a keypad offers |
 
 The component tests exist because the property tests caught **every** maths bug
 and **zero** UI bugs. A bare answer with no label, a session restarting on each
@@ -157,8 +157,8 @@ guessing is marking a correct answer wrong.
 
 ## Known gaps
 
-- **2 of 55 skills are unimplemented**: `p-inequalities` (#18) and
-  `n-count-20`, which needs a visual counting interface and is irrelevant to an
-  11- and 13-year-old.
+- **1 of 55 skills is unimplemented**: `n-count-20`, which needs a visual
+  counting interface and is irrelevant to an 11- and 13-year-old. Every other
+  skill generates, grades and renders.
 - **No server code exists yet.** The hints path is designed, not built.
 - **Placement is a single snapshot.** "Change my level" is the only correction.

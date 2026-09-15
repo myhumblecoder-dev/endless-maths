@@ -14,7 +14,12 @@ import { dec, int, problem } from './build'
  */
 
 /** Renders a coefficient the way a human writes it: `x`, not `1x`. */
-const term = (coefficient: number): string => (coefficient === 1 ? 'x' : `${coefficient}x`)
+const term = (coefficient: number): string => {
+  if (coefficient === 1) return 'x'
+  if (coefficient === -1) return '−x'
+  // A typographic minus throughout, matching how the answers are written.
+  return coefficient < 0 ? `−${Math.abs(coefficient)}x` : `${coefficient}x`
+}
 
 /** Renders `+ 4` / `− 4` rather than `+ -4`. */
 const signed = (n: number): string => `${n < 0 ? '−' : '+'} ${Math.abs(n)}`
@@ -111,5 +116,44 @@ export const pDistribute: Generator = (rng: Rng) => {
     `${outside < 0 ? `−${Math.abs(outside)}` : outside}(${term(inner)} ${sign} ${Math.abs(constant)})`,
     { kind: 'expression', canonical: linear(outside * inner, outside * constant) },
     [outside, inner, constant],
+  )
+}
+
+/**
+ * Solving a linear inequality.
+ *
+ * Built backwards like the equations: pick the boundary the answer lands on,
+ * then construct the inequality around it.
+ *
+ * A negative coefficient is included deliberately and often. Dividing by a
+ * negative flips the relation, and that is the classic misconception at this
+ * level — a run of positive coefficients would never meet it. The flip is
+ * applied here exactly once, when the coefficient is negative.
+ */
+const RELATIONS = ['<', '>', '<=', '>='] as const
+
+const flip = (relation: string): string =>
+  relation.startsWith('<') ? relation.replace('<', '>') : relation.replace('>', '<')
+
+export const pInequalities: Generator = (rng: Rng) => {
+  const boundary = pick(rng, -6, 9)
+  const magnitude = pick(rng, 2, 9)
+  const negative = rng() < 0.45
+  const a = negative ? -magnitude : magnitude
+  const b = pick(rng, -10, 20)
+  const relation = pickFrom(rng, RELATIONS)
+
+  // With c = a*boundary + b, the inequality is true exactly at the boundary.
+  const c = a * boundary + b
+  const answer = `x${negative ? flip(relation) : relation}${boundary}`
+
+  const relationSymbol = relation === '<=' ? '≤' : relation === '>=' ? '≥' : relation
+  const rhs = c < 0 ? `−${Math.abs(c)}` : `${c}`
+
+  return problem(
+    'p-inequalities',
+    `Solve ${term(a)} ${signed(b)} ${relationSymbol} ${rhs}`,
+    { kind: 'expression', canonical: answer },
+    [a, b, boundary],
   )
 }

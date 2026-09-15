@@ -2,6 +2,29 @@
 
 import type { Answer, Verdict } from '@/lib/curriculum/types'
 
+/** `<=` reads as two characters; `≤` reads as the thing it means. */
+const RELATION_SYMBOL: Record<string, string> = { '<=': '≤', '>=': '≥', '<': '<', '>': '>' }
+
+/**
+ * Space an expression around its operators — but never around a sign.
+ *
+ * Naive replacement turns "x<-6" into "x< − 6", where the minus reads as an
+ * operator with nothing on its left. A leading minus belongs to the number.
+ */
+function writeSide(side: string): string {
+  const negative = side.startsWith('-')
+  const body = negative ? side.slice(1) : side
+  const spaced = body.replace(/\+/g, ' + ').replace(/-/g, ' − ')
+  return negative ? `−${spaced}` : spaced
+}
+
+function writeExpression(canonical: string): string {
+  const match = canonical.match(/^(.*?)(<=|>=|<|>)(.*)$/)
+  if (!match) return writeSide(canonical)
+  const [, left, relation, right] = match
+  return `${writeSide(left)} ${RELATION_SYMBOL[relation]} ${writeSide(right)}`
+}
+
 export function formatAnswer(answer: Answer): string {
   switch (answer.kind) {
     case 'integer':
@@ -21,8 +44,7 @@ export function formatAnswer(answer: Answer): string {
     case 'parts':
       return answer.parts.join(` ${answer.separator} `)
     case 'expression':
-      // Written the way a person writes it: a typographic minus, spaced.
-      return answer.canonical.replace(/\+/g, ' + ').replace(/-/g, ' − ').replace(/^ − /, '−')
+      return writeExpression(answer.canonical)
     default:
       return ''
   }

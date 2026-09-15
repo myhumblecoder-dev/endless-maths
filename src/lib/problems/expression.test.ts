@@ -146,3 +146,89 @@ test('a negative multiplier is written with a real minus sign', () => {
     assert.doesNotMatch(p.prompt, /^-\d/, `"${p.prompt}" uses a hyphen, not a minus`)
   }
 })
+
+// ---- p-inequalities -------------------------------------------------------
+
+const inequalities = (n = 800) => {
+  const rng = seeded(1818)
+  return Array.from({ length: n }, () => generate('p-inequalities', rng))
+}
+
+test('an inequality is answered with a range, not a number', () => {
+  for (const p of inequalities()) {
+    assert.ok(p.answer.kind === 'expression')
+    if (p.answer.kind !== 'expression') continue
+    assert.match(p.answer.canonical, /^x(<=|>=|<|>)-?\d+$/, p.answer.canonical)
+    assert.equal(check(p.answer, String(p.operands[2])), 'incorrect',
+      `${p.prompt}: the boundary alone is not the answer`)
+  }
+})
+
+test('the stated range actually solves the inequality', () => {
+  for (const p of inequalities()) {
+    const [a, b] = p.operands
+    assert.ok(p.answer.kind === 'expression')
+    if (p.answer.kind !== 'expression') continue
+    const [, answerRelation, boundaryText] = p.answer.canonical.match(/^x(<=|>=|<|>)(-?\d+)$/)!
+    const boundary = Number(boundaryText)
+    // The ORIGINAL inequality is what a value must satisfy — not the answer's
+    // relation, which may have been flipped on the way.
+    // Prompts use the proper symbols, so map them back to compare.
+    const promptSymbol = p.prompt.match(/([≤≥<>])/)![1]
+    const promptRelation = promptSymbol === '≤' ? '<=' : promptSymbol === '≥' ? '>=' : promptSymbol
+    const c = Number(p.prompt.trim().split(' ').pop()!.replace('−', '-'))
+
+    const inside = answerRelation.startsWith('<') ? boundary - 1 : boundary + 1
+    const lhs = a * inside + b
+    const holds =
+      promptRelation === '<' ? lhs < c
+      : promptRelation === '>' ? lhs > c
+      : promptRelation === '<=' ? lhs <= c
+      : lhs >= c
+    assert.ok(holds,
+      `${p.prompt} -> ${p.answer.canonical}: x=${inside} gives ${lhs}, which fails ${promptRelation} ${c}`)
+  }
+})
+
+/**
+ * The classic Year 8 misconception: multiplying or dividing by a negative flips
+ * the inequality. A run of positive coefficients would never meet it.
+ */
+test('negative coefficients come up, and the sign flips when they do', () => {
+  const negatives = inequalities().filter((p) => p.operands[0] < 0)
+  assert.ok(negatives.length > 50, `only ${negatives.length} negative coefficients in 800`)
+
+  for (const p of negatives) {
+    assert.ok(p.answer.kind === 'expression')
+    if (p.answer.kind !== 'expression') continue
+    const promptSymbol = p.prompt.match(/([≤≥<>])/)![1]
+    const promptDirection = promptSymbol === '≤' || promptSymbol === '<' ? '<' : '>'
+    const answerDirection = p.answer.canonical.includes('<') ? '<' : '>'
+    assert.notEqual(answerDirection, promptDirection,
+      `${p.prompt} -> ${p.answer.canonical}: the sign should have flipped`)
+  }
+})
+
+test('forgetting to flip the sign is marked wrong', () => {
+  for (const p of inequalities(200).filter((q) => q.operands[0] < 0)) {
+    assert.ok(p.answer.kind === 'expression')
+    if (p.answer.kind !== 'expression') continue
+    const unflipped = p.answer.canonical
+      .replace('<=', '§').replace('>=', '<=').replace('§', '>=')
+      .replace(/(?<![<>])<(?!=)/, '§').replace(/(?<![<>])>(?!=)/, '<').replace('§', '>')
+    if (unflipped === p.answer.canonical) continue
+    assert.equal(check(p.answer, unflipped), 'incorrect', `${p.prompt}: ${unflipped} accepted`)
+  }
+})
+
+test('inequalities have enough distinct problems', () => {
+  const distinct = new Set(inequalities(2000).map((p) => p.prompt)).size
+  assert.ok(distinct >= 25, `only ${distinct} distinct problems`)
+})
+
+test('inequality prompts use proper symbols throughout', () => {
+  for (const p of inequalities()) {
+    assert.doesNotMatch(p.prompt, /<=|>=/, `"${p.prompt}" should use ≤ or ≥`)
+    assert.doesNotMatch(p.prompt, / -\d/, `"${p.prompt}" should use a typographic minus`)
+  }
+})
