@@ -59,13 +59,13 @@ export const SKILLS: Skill[] = [
   { id: 'f-percent-of', strand: 'fractions', kind: 'procedure', label: 'Percentages of amounts', requires: ['f-convert-fdp', 'm-2digit-x-1digit'], answerKind: 'integer', typicalAge: [10, 12] },
 
   // ---- ratio, negatives, order of operations ------------------------------
-  { id: 'r-factors-multiples', strand: 'ratio-negatives', kind: 'procedure', label: 'Factors and multiples', requires: ['m-div-6-7-8-9'], answerKind: 'set', typicalAge: [9, 11] },
+  { id: 'r-factors-multiples', strand: 'ratio-negatives', kind: 'procedure', label: 'Factors and multiples', requires: ['m-div-6-7-8-9'], answerKind: 'integer', typicalAge: [9, 11] },
   { id: 'r-primes', strand: 'ratio-negatives', kind: 'fact', label: 'Prime numbers', requires: ['r-factors-multiples'], answerKind: 'choice', typicalAge: [10, 11] },
   { id: 'r-squares', strand: 'ratio-negatives', kind: 'fact', label: 'Square numbers', requires: ['m-times-6-7-8-9'], answerKind: 'integer', typicalAge: [9, 11] },
   { id: 'r-order-of-ops', strand: 'ratio-negatives', kind: 'procedure', label: 'Order of operations', requires: ['m-2digit-x-1digit', 'a-add-3digit'], answerKind: 'integer', typicalAge: [10, 12] },
   { id: 'r-negative-add-sub', strand: 'ratio-negatives', kind: 'procedure', label: 'Adding and subtracting negatives', requires: ['a-sub-3digit'], answerKind: 'integer', typicalAge: [10, 12] },
   { id: 'r-negative-mul-div', strand: 'ratio-negatives', kind: 'procedure', label: 'Multiplying and dividing negatives', requires: ['r-negative-add-sub', 'm-long-div'], answerKind: 'integer', typicalAge: [11, 13] },
-  { id: 'r-ratio-simplify', strand: 'ratio-negatives', kind: 'procedure', label: 'Simplifying ratios', requires: ['r-factors-multiples', 'f-equivalent'], answerKind: 'set', typicalAge: [10, 12] },
+  { id: 'r-ratio-simplify', strand: 'ratio-negatives', kind: 'procedure', label: 'Simplifying ratios', requires: ['r-factors-multiples', 'f-equivalent'], answerKind: 'parts', typicalAge: [10, 12] },
   { id: 'r-proportion', strand: 'ratio-negatives', kind: 'procedure', label: 'Proportion', requires: ['r-ratio-simplify'], answerKind: 'integer', typicalAge: [11, 13] },
 
   // ---- pre-algebra --------------------------------------------------------

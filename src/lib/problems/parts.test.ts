@@ -5,6 +5,7 @@ import { formatAnswer } from './format'
 import { press, canSubmit } from '@/lib/session/keypad'
 import type { Answer } from '@/lib/curriculum/types'
 import { generate, seeded } from './index'
+import { gcd } from './fraction'
 
 const remainder = (q: number, r: number): Answer => ({ kind: 'parts', parts: [q, r], separator: 'r' })
 const ratio = (a: number, b: number): Answer => ({ kind: 'parts', parts: [a, b], separator: ':' })
@@ -116,4 +117,85 @@ test('remainder questions have enough distinct problems', () => {
   const rng = seeded(3)
   const distinct = new Set(Array.from({ length: 2000 }, () => generate('m-div-remainder', rng).prompt))
   assert.ok(distinct.size >= 25, `only ${distinct.size} distinct problems`)
+})
+
+// ---- r-ratio-simplify -----------------------------------------------------
+
+test('simplifying a ratio answers in lowest terms', () => {
+  const rng = seeded(202)
+  for (let i = 0; i < 800; i++) {
+    const p = generate('r-ratio-simplify', rng)
+    const [, a, b] = p.prompt.match(/^Simplify (\d+) : (\d+)$/)!.map(Number)
+    assert.ok(p.answer.kind === 'parts')
+    if (p.answer.kind !== 'parts') continue
+    const [x, y] = p.answer.parts
+    assert.equal(p.answer.separator, ':')
+    assert.equal(gcd(x, y), 1, `${p.prompt} -> ${x} : ${y} is not in lowest terms`)
+    assert.equal(a * y, b * x, `${p.prompt} -> ${x} : ${y} is not equivalent`)
+    assert.notEqual(gcd(a, b), 1, `${p.prompt} is already simplified — nothing to do`)
+  }
+})
+
+test('an unsimplified ratio is nudged, and a wrong one is marked wrong', () => {
+  const rng = seeded(9)
+  for (let i = 0; i < 200; i++) {
+    const p = generate('r-ratio-simplify', rng)
+    const [, a, b] = p.prompt.match(/^Simplify (\d+) : (\d+)$/)!.map(Number)
+    assert.ok(p.answer.kind === 'parts')
+    if (p.answer.kind !== 'parts') continue
+    // Restating the question is right but unfinished.
+    assert.equal(check(p.answer, `${a}:${b}`), 'equivalent-unsimplified', p.prompt)
+    // Flipping it is simply wrong.
+    assert.equal(check(p.answer, `${p.answer.parts[1]}:${p.answer.parts[0]}`), 'incorrect', p.prompt)
+  }
+})
+
+// ---- r-factors-multiples --------------------------------------------------
+
+/**
+ * Asked as highest common factor and lowest common multiple, both of which
+ * have a single whole-number answer. Listing every factor of 24 is a Year 5
+ * activity and would need a long comma-separated entry; HCF and LCM are what an
+ * 11- to 13-year-old actually does, and they are what common denominators need.
+ */
+test('factors and multiples ask for a single number', () => {
+  const rng = seeded(77)
+  for (let i = 0; i < 800; i++) {
+    const p = generate('r-factors-multiples', rng)
+    assert.equal(p.answer.kind, 'integer')
+    assert.match(p.prompt, /^(highest common factor|lowest common multiple) of \d+ and \d+$/i)
+  }
+})
+
+test('the stated factor or multiple is right', () => {
+  const rng = seeded(5)
+  const hcf = (a: number, b: number) => gcd(a, b)
+  for (let i = 0; i < 800; i++) {
+    const p = generate('r-factors-multiples', rng)
+    const [, kind, a, b] = p.prompt.match(/^(\w+) common (?:factor|multiple) of (\d+) and (\d+)$/i)!
+    const x = Number(a)
+    const y = Number(b)
+    assert.ok(p.answer.kind === 'integer')
+    if (p.answer.kind !== 'integer') continue
+    const expected = kind.toLowerCase() === 'highest' ? hcf(x, y) : (x * y) / hcf(x, y)
+    assert.equal(p.answer.value, expected, p.prompt)
+  }
+})
+
+test('a highest common factor question is never trivially 1', () => {
+  const rng = seeded(31)
+  for (let i = 0; i < 800; i++) {
+    const p = generate('r-factors-multiples', rng)
+    if (!/highest/i.test(p.prompt)) continue
+    assert.ok(p.answer.kind === 'integer' && p.answer.value > 1,
+      `${p.prompt} has no common factor worth finding`)
+  }
+})
+
+test('both new skills have enough distinct problems', () => {
+  for (const skill of ['r-ratio-simplify', 'r-factors-multiples'] as const) {
+    const rng = seeded(4)
+    const distinct = new Set(Array.from({ length: 2000 }, () => generate(skill, rng).prompt))
+    assert.ok(distinct.size >= 25, `${skill} produces only ${distinct.size} distinct problems`)
+  }
 })
