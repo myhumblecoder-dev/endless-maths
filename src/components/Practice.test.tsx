@@ -247,3 +247,25 @@ test('the suggestion can be declined', { timeout: 60_000 }, async () => {
   assert.equal(picked.length, 0, 'nothing should be forced on them')
   expect(screen.getByRole('button', { name: /^Again$/ })).toBeTruthy()
 })
+
+// ---- making the mix legible ----------------------------------------------
+// Interleaving means a session on one topic shows others. Unexplained, that
+// reads as the app being random rather than deliberate.
+
+test('a problem from another skill is labelled as review', { timeout: 40_000 }, async () => {
+  render(<Harness skill="a-add-within-20" />)
+
+  let sawReview = false
+  let sawChosen = false
+  for (let i = 0; i < 12; i++) {
+    const header = document.body.textContent ?? ''
+    const onChosen = !!numericPrompt()?.match(/^\d+ \+ \d+$/)
+    if (/Review/i.test(header)) sawReview = true
+    if (onChosen && !/Review/i.test(header)) sawChosen = true
+    answerCorrectly()
+    await settle()
+  }
+
+  assert.ok(sawReview, 'problems from other skills should say so')
+  assert.ok(sawChosen, 'the chosen skill should not be labelled review')
+})

@@ -223,12 +223,22 @@ export function Practice({ skill, progress, onProgress, onLeave, onPickSkill, se
             type="button"
             onClick={onLeave}
             className="-ml-1 rounded px-1 hover:text-slate-900 dark:hover:text-slate-100"
-            aria-label="Back to the skill list"
+            aria-label="Back to the topic list"
           >
             ← {label}
           </button>
           <span>{session.index + 1} / {SESSION_LENGTH}</span>
         </div>
+
+        {/*
+          Sessions interleave, so a session on one topic shows others.
+          Unexplained, that reads as the app being random rather than
+          deliberate — so say which topic a problem came from when it is not
+          the one they chose.
+        */}
+        <p className="mt-2 h-5 text-xs text-slate-400 dark:text-slate-500">
+          {problem.skill !== skill && `Review · ${SKILL_BY_ID.get(problem.skill)?.label ?? ''}`}
+        </p>
         <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
           <div
             className="h-full rounded-full bg-emerald-500 transition-all duration-300"

@@ -16,9 +16,17 @@ import type { ImplementedSkill } from '@/lib/problems'
 export function App() {
   const [progress, setProgress] = useState<Progress | null>(null)
   const [skill, setSkill] = useState<ImplementedSkill | null>(null)
+  /** Stamped when the map is shown, not read during render. */
+  const [now, setNow] = useState(0)
 
-  // eslint-disable-next-line react-hooks/set-state-in-effect
-  useEffect(() => { setProgress(loadProgress(browserStore())) }, [])
+  /* eslint-disable react-hooks/set-state-in-effect --
+     Deferred init. Neither localStorage nor the clock exists during server
+     rendering, so both have to be read on mount. */
+  useEffect(() => {
+    setProgress(loadProgress(browserStore()))
+    setNow(Date.now())
+  }, [])
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const persist = useCallback((next: Progress) => {
     saveProgress(browserStore(), next)
@@ -50,6 +58,7 @@ export function App() {
       progress={progress}
       onPick={setSkill}
       onRetakePlacement={() => persist({ ...progress, placed: [], placementDone: false })}
+      now={now}
     />
   )
 }

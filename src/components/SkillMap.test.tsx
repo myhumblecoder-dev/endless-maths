@@ -3,7 +3,7 @@ import { test, afterEach, expect, vi } from 'vitest'
 import assert from 'node:assert/strict'
 import { render, screen, fireEvent, cleanup } from '@testing-library/react'
 import { SkillMap } from './SkillMap'
-import { emptyProgress, type Progress } from '@/lib/mastery/mastery'
+import { emptyProgress, record, type Progress } from '@/lib/mastery/mastery'
 
 afterEach(cleanup)
 
@@ -15,7 +15,7 @@ const placed = (...skills: string[]): Progress => ({
 
 test('unlocked skills can be chosen', () => {
   const onPick = vi.fn()
-  render(<SkillMap progress={placed()} onPick={onPick} onRetakePlacement={() => {}} />)
+  render(<SkillMap progress={placed()} onPick={onPick} onRetakePlacement={() => {}} now={0} />)
 
   fireEvent.click(screen.getByRole('button', { name: /Number bonds to 10/ }))
   assert.deepEqual(onPick.mock.calls, [['n-bonds-10']])
@@ -23,7 +23,7 @@ test('unlocked skills can be chosen', () => {
 
 test('locked skills are visible but cannot be chosen', () => {
   const onPick = vi.fn()
-  render(<SkillMap progress={placed()} onPick={onPick} onRetakePlacement={() => {}} />)
+  render(<SkillMap progress={placed()} onPick={onPick} onRetakePlacement={() => {}} now={0} />)
 
   const locked = screen.getByRole('button', { name: /Two-step equations \(locked\)/ }) as HTMLButtonElement
   assert.equal(locked.disabled, true, 'locks are hard — seeing what is coming must not mean tapping into it')
@@ -32,7 +32,7 @@ test('locked skills are visible but cannot be chosen', () => {
 })
 
 test('mastered skills are marked done', () => {
-  render(<SkillMap progress={placed('n-bonds-10')} onPick={() => {}} onRetakePlacement={() => {}} />)
+  render(<SkillMap progress={placed('n-bonds-10')} onPick={() => {}} onRetakePlacement={() => {}} now={0} />)
   const bonds = screen.getByRole('button', { name: /Number bonds to 10/ })
   assert.match(bonds.textContent ?? '', /done/)
 })
@@ -43,7 +43,7 @@ test('mastered skills are marked done', () => {
  */
 test('placement can be retaken, behind a deliberate second tap', () => {
   const onRetake = vi.fn()
-  render(<SkillMap progress={placed()} onPick={() => {}} onRetakePlacement={onRetake} />)
+  render(<SkillMap progress={placed()} onPick={() => {}} onRetakePlacement={onRetake} now={0} />)
 
   fireEvent.click(screen.getByRole('button', { name: /Change my level/i }))
   assert.equal(onRetake.mock.calls.length, 0, 'one tap must not wipe a level by accident')
@@ -54,10 +54,27 @@ test('placement can be retaken, behind a deliberate second tap', () => {
 
 test('the confirmation can be backed out of', () => {
   const onRetake = vi.fn()
-  render(<SkillMap progress={placed()} onPick={() => {}} onRetakePlacement={onRetake} />)
+  render(<SkillMap progress={placed()} onPick={() => {}} onRetakePlacement={onRetake} now={0} />)
 
   fireEvent.click(screen.getByRole('button', { name: /Change my level/i }))
   fireEvent.click(screen.getByRole('button', { name: /Cancel/i }))
   assert.equal(onRetake.mock.calls.length, 0)
   expect(screen.getByRole('button', { name: /Change my level/i })).toBeTruthy()
+})
+
+test('the map explains that sessions mix in review', () => {
+  render(<SkillMap progress={placed()} onPick={() => {}} onRetakePlacement={() => {}} now={0} />)
+  assert.match(document.body.textContent ?? '', /review/i,
+    'a session that silently mixes topics reads as random')
+})
+
+test('a skill with facts due says so', () => {
+  // The whole prerequisite chain, or the skill is locked and shows no badge.
+  const p = record(placed('n-bonds-10', 'a-add-within-10', 'a-add-within-20', 'm-times-2-5-10'), {
+    problemId: 'x', skill: 'm-times-2-5-10', factKey: 'mul:5x7',
+    given: '30', verdict: 'incorrect', elapsedMs: 4000, at: 0,
+  })
+  render(<SkillMap progress={p} onPick={() => {}} onRetakePlacement={() => {}} now={60 * 60 * 1000} />)
+  const row = screen.getByRole('button', { name: /The 2, 5 and 10 times tables/ })
+  assert.match(row.textContent ?? '', /1 to review/i, 'due work should be visible before starting')
 })
