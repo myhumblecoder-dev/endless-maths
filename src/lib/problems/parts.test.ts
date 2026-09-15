@@ -57,30 +57,30 @@ test('parts are written with their separator spaced out', () => {
 // ---- input ----------------------------------------------------------------
 
 test('the separator key needs a number before it, and comes only once', () => {
-  assert.equal(press('7', 'r'), '7r')
-  assert.equal(press('', 'r'), '', 'nothing to separate yet')
-  assert.equal(press('7r', 'r'), '7r')
-  assert.equal(press('7r2', 'r'), '7r2')
-  assert.equal(press('2', ':'), '2:')
-  assert.equal(press('', ':'), '')
+  assert.equal(press('7', 'r', remainder(7, 2)), '7r')
+  assert.equal(press('', 'r', remainder(7, 2)), '', 'nothing to separate yet')
+  assert.equal(press('7r', 'r', remainder(7, 2)), '7r')
+  assert.equal(press('7r2', 'r', remainder(7, 2)), '7r2')
+  assert.equal(press('2', ':', ratio(2, 3)), '2:')
+  assert.equal(press('', ':', ratio(2, 3)), '')
 })
 
 test('a separator does not mix with a slash or a decimal point', () => {
-  assert.equal(press('3/4', 'r'), '3/4')
-  assert.equal(press('3.5', ':'), '3.5')
-  assert.equal(press('7r2', '/'), '7r2')
+  assert.equal(press('3/4', 'r', remainder(7, 2)), '3/4')
+  assert.equal(press('3.5', ':', ratio(2, 3)), '3.5')
+  assert.equal(press('7r2', '/', remainder(7, 2)), '7r2')
 })
 
 test('backspace walks back out of the second part', () => {
-  assert.equal(press('7r2', 'back'), '7r')
-  assert.equal(press('7r', 'back'), '7')
+  assert.equal(press('7r2', 'back', remainder(7, 2)), '7r')
+  assert.equal(press('7r', 'back', remainder(7, 2)), '7')
 })
 
 test('a half-typed multi-part answer cannot be submitted', () => {
-  assert.equal(canSubmit('7r'), false)
-  assert.equal(canSubmit('7r2'), true)
-  assert.equal(canSubmit('2:'), false)
-  assert.equal(canSubmit('2:3'), true)
+  assert.equal(canSubmit('7r', remainder(7, 2)), false)
+  assert.equal(canSubmit('7r2', remainder(7, 2)), true)
+  assert.equal(canSubmit('2:', ratio(2, 3)), false)
+  assert.equal(canSubmit('2:3', ratio(2, 3)), true)
 })
 
 // ---- m-div-remainder ------------------------------------------------------

@@ -57,6 +57,9 @@ would make extracting an engine package a directory move rather than a refactor.
 - **`index.ts`** — the `GENERATORS` registry and `generate()`.
 - **`check.ts`** — grading. Throws on answer kinds it cannot grade rather than
   guessing, because a wrong `false` marks a correct answer wrong.
+- **`expression.ts`** — canonical form for linear expressions in one variable.
+  About a hundred lines, no dependency — see `research.md` for why the
+  alternative was 1.5 MB of computer-algebra system.
 - **`fraction.ts`** — integer-only fraction arithmetic: `gcd`, `simplify`,
   `parseFraction`, `sameValue`. Nothing here converts to a decimal, because
   `1/3` has none and comparing by float would eventually mark a correct answer
@@ -74,7 +77,10 @@ would make extracting an engine package a directory move rather than a refactor.
   and the session mix interleaves review with the chosen skill.
 - **`diagnose.ts`** — `isStruggling()`, `gapBehind()`. Finds the weak foundation
   under a skill someone keeps failing.
-- **`keypad.ts`** — `press()`, `canSubmit()`, `isEntryKey()`. Pure input rules.
+- **`keypad.ts`** — `press()`, `canSubmit()`, `isEntryKey()`. Pure input rules,
+  each taking the expected `Answer`: the rules genuinely differ by kind, and a
+  context-free version let `x` into a times-tables answer and graded a correct
+  one wrong.
 
 ### `lib/placement/`
 - **`placement.ts`** — the level-check state machine.
@@ -104,6 +110,9 @@ produced a real bug.
    a teacher can hand one set to a class.
 7. **Components render; `lib/` decides.** Any rule that can be stated without a
    DOM belongs below the component layer.
+8. **Input rules take the expected answer.** What a key means depends on what is
+   being asked for. A context-free keypad accepted `x` during a times table,
+   so `56` + `x` submitted as `"56x"` and graded wrong.
 
 ## Testing strategy
 
@@ -141,13 +150,15 @@ the pure suites stay in plain node.
 3. Add a branch to `formatAnswer()`.
 4. Give `Keypad` an input mode for it.
 
-Step 2 is where care is owed: the default branch throws deliberately, so a
-missing branch fails loudly rather than marking a learner wrong.
+Step 2 is where care is owed. Every kind is handled, so TypeScript narrows the
+default branch to `never` — a new kind without a branch is a **compile error**,
+not a runtime surprise. The throw stays behind it anyway, because the cost of
+guessing is marking a correct answer wrong.
 
 ## Known gaps
 
-- **4 of 55 skills are unimplemented**: the three expression skills (#16-18),
-  and `n-count-20`, which needs a visual counting interface and is irrelevant
-  to an 11- and 13-year-old.
+- **2 of 55 skills are unimplemented**: `p-inequalities` (#18) and
+  `n-count-20`, which needs a visual counting interface and is irrelevant to an
+  11- and 13-year-old.
 - **No server code exists yet.** The hints path is designed, not built.
 - **Placement is a single snapshot.** "Change my level" is the only correction.

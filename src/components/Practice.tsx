@@ -119,28 +119,30 @@ export function Practice({ skill, progress, onProgress, onLeave, onPickSkill, se
   }, [session, feedback, onProgress, advance])
 
   const onKey = useCallback((key: string) => {
-    if (feedback) return
+    if (feedback || !problem) return
     if (key.startsWith('choice:')) return commit(key.slice('choice:'.length))
-    setEntry((e) => press(e, key))
-  }, [feedback, commit])
+    setEntry((e) => press(e, key, problem.answer))
+  }, [feedback, commit, problem])
 
   // Physical keyboard, for older children and anyone on a laptop.
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
+      // Every rule below depends on what kind of answer is wanted.
+      if (!problem) return
+
       // Typing while the outcome is on screen means they have moved on. Skip
       // the feedback and keep the keystroke — dropping it silently truncates
       // the next answer, which marks a correct answer wrong.
       if (feedback) {
-        if (!isEntryKey(e.key)) return
+        if (!isEntryKey(e.key, problem.answer)) return
         advance()
-        setEntry((v) => press(v, e.key))
+        setEntry((v) => press(v, e.key, problem.answer))
         return
       }
-      if (!problem) return
 
-      if (isEntryKey(e.key)) setEntry((v) => press(v, e.key))
-      else if (e.key === 'Backspace') setEntry((v) => press(v, 'back'))
-      else if (e.key === 'Enter' && entryCanSubmit(entry)) commit(entry)
+      if (isEntryKey(e.key, problem.answer)) setEntry((v) => press(v, e.key, problem.answer))
+      else if (e.key === 'Backspace') setEntry((v) => press(v, 'back', problem.answer))
+      else if (e.key === 'Enter' && entryCanSubmit(entry, problem.answer)) commit(entry)
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
@@ -287,7 +289,7 @@ export function Practice({ skill, progress, onProgress, onLeave, onPickSkill, se
         answer={problem.answer}
         onKey={onKey}
         onSubmit={() => commit(entry)}
-        canSubmit={entryCanSubmit(entry)}
+        canSubmit={entryCanSubmit(entry, problem.answer)}
         disabled={feedback !== null}
       />
     </main>

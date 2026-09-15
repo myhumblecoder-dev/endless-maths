@@ -20,6 +20,9 @@ export function formatAnswer(answer: Answer): string {
       return `${answer.whole} ${answer.num}/${answer.den}`
     case 'parts':
       return answer.parts.join(` ${answer.separator} `)
+    case 'expression':
+      // Written the way a person writes it: a typographic minus, spaced.
+      return answer.canonical.replace(/\+/g, ' + ').replace(/-/g, ' − ').replace(/^ − /, '−')
     default:
       return ''
   }

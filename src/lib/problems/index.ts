@@ -71,6 +71,8 @@ export const GENERATORS = {
   'f-decimal-mult': dc.fDecimalMult,
 
   'p-evaluate': pa.pEvaluate,
+  'p-like-terms': pa.pLikeTerms,
+  'p-distribute': pa.pDistribute,
   'p-solve-one-step': pa.pSolveOneStep,
   'p-solve-two-step': pa.pSolveTwoStep,
   'p-solve-both-sides': pa.pSolveBothSides,

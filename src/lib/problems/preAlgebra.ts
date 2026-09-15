@@ -1,5 +1,6 @@
 import type { Generator, Rng } from '@/lib/curriculum/types'
-import { pick } from './rng'
+import { pick, pickFrom } from './rng'
+import { linear } from './expression'
 import { dec, int, problem } from './build'
 
 /**
@@ -62,4 +63,53 @@ export const pFormula: Generator = (rng: Rng) => {
   return rng() < 0.5
     ? problem('p-formula', `Area of a rectangle ${(wScaled / 10).toFixed(1)}cm by ${h}cm`, dec(wScaled * h, 1), [wScaled, h])
     : problem('p-formula', `Perimeter of a rectangle ${(wScaled / 10).toFixed(1)}cm by ${h}cm`, dec(2 * (wScaled + h * 10), 1), [wScaled, h])
+}
+
+/**
+ * Collecting like terms.
+ *
+ * The question is itself a linear expression, so the test that the answer is
+ * equivalent is just "normalise the prompt and the answer and compare" — no
+ * separate solver to go wrong. Always poses something that genuinely needs
+ * collecting.
+ */
+export const pLikeTerms: Generator = (rng: Rng) => {
+  const a = pick(rng, 2, 9)
+  const b = pick(rng, 1, 9)
+  const c = pick(rng, 1, 12)
+  const d = pick(rng, 1, 12)
+  const subtractX = rng() < 0.35 && a > b
+
+  const xTotal = subtractX ? a - b : a + b
+  const constant = c + d
+
+  return problem(
+    'p-like-terms',
+    subtractX
+      ? `${term(a)} + ${c} − ${term(b)} + ${d}`
+      : `${term(a)} + ${c} + ${term(b)} + ${d}`,
+    { kind: 'expression', canonical: linear(xTotal, constant) },
+    [a, b, c, d],
+  )
+}
+
+/**
+ * Expanding brackets. A negative multiplier is included deliberately — dropping
+ * the sign on the second term is the classic slip at this level, and a run of
+ * positive multipliers would never meet it.
+ */
+export const pDistribute: Generator = (rng: Rng) => {
+  const outside = pickFrom(rng, [2, 3, 4, 5, 6, -2, -3, -4])
+  const inner = pick(rng, 1, 9)
+  const constant = pick(rng, 1, 12) * (rng() < 0.3 ? -1 : 1)
+
+  const sign = constant < 0 ? '−' : '+'
+
+  return problem(
+    'p-distribute',
+    // A real minus sign, matching how the answer is written.
+    `${outside < 0 ? `−${Math.abs(outside)}` : outside}(${term(inner)} ${sign} ${Math.abs(constant)})`,
+    { kind: 'expression', canonical: linear(outside * inner, outside * constant) },
+    [outside, inner, constant],
+  )
 }
