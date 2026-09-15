@@ -12,6 +12,9 @@ function typeIn(text: string): string {
   return entry
 }
 
+/** Answer kinds the keypad can produce character by character. */
+const TYPEABLE = new Set(['integer', 'decimal', 'fraction'])
+
 /** Every spelling a person might reasonably produce for this answer. */
 function spellings(a: Answer): string[] {
   switch (a.kind) {
@@ -22,6 +25,11 @@ function spellings(a: Answer): string[] {
       return [a.value.toFixed(a.dp), String(a.value)]
     case 'choice':
       return [a.value]
+    case 'fraction':
+      return [`${a.num}/${a.den}`]
+    case 'mixed':
+      // Both forms are the same answer; a learner may type either.
+      return [`${a.whole} ${a.num}/${a.den}`, `${a.whole * a.den + a.num}/${a.den}`]
     default:
       return []
   }
@@ -35,8 +43,9 @@ test('every answer a person can type is graded correct', () => {
     for (let i = 0; i < 400; i++) {
       const p = generate(skill, rng)
       for (const text of spellings(p.answer)) {
-        if (p.answer.kind === 'choice') {
-          if (check(p.answer, text) !== 'correct') failures.push(`${skill}: "${p.prompt}" choice "${text}"`)
+        if (!TYPEABLE.has(p.answer.kind)) {
+          // Choice and mixed answers are not typed key by key.
+          if (check(p.answer, text) !== 'correct') failures.push(`${skill}: "${p.prompt}" -> "${text}"`)
           continue
         }
         const entry = typeIn(text)
@@ -66,10 +75,15 @@ test('the keypad can physically produce every answer', () => {
       const p = generate(skill, rng)
       if (p.answer.kind === 'choice') continue
       const a = p.answer
-      if (a.kind !== 'integer' && a.kind !== 'decimal') continue
-      const text = a.kind === 'decimal' ? a.value.toFixed(a.dp) : String(a.value)
+      if (a.kind !== 'integer' && a.kind !== 'decimal' && a.kind !== 'fraction') continue
+      const text = a.kind === 'decimal' ? a.value.toFixed(a.dp)
+        : a.kind === 'fraction' ? `${a.num}/${a.den}`
+        : String(a.value)
       // Keys the keypad offers for this answer kind.
-      const keys = new Set(['0','1','2','3','4','5','6','7','8','9','back', a.kind === 'decimal' ? '.' : '-'])
+      const keys = new Set([
+        '0','1','2','3','4','5','6','7','8','9','back',
+        a.kind === 'decimal' ? '.' : a.kind === 'fraction' ? '/' : '-',
+      ])
       for (const ch of text) {
         const key = ch === '-' || ch === '−' ? '-' : ch
         if (!keys.has(key)) failures.push(`${skill}: "${p.prompt}" needs key "${key}" which the keypad does not show`)

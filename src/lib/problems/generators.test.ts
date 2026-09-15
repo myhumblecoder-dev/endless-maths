@@ -59,6 +59,8 @@ test('the correct answer always grades as correct', () => {
         p.answer.kind === 'integer' ? String(p.answer.value)
         : p.answer.kind === 'decimal' ? p.answer.value.toFixed(p.answer.dp)
         : p.answer.kind === 'choice' ? p.answer.value
+        : p.answer.kind === 'fraction' ? `${p.answer.num}/${p.answer.den}`
+        : p.answer.kind === 'mixed' ? `${p.answer.whole} ${p.answer.num}/${p.answer.den}`
         : null
       assert.ok(typed !== null, `${skill}: unhandled answer kind ${p.answer.kind}`)
       assert.equal(check(p.answer, typed), 'correct', `${skill}: ${p.prompt} -> "${typed}" graded wrong`)
