@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { PlacementQuiz } from './PlacementQuiz'
+import { PlacementResult } from './PlacementResult'
 import { SkillMap } from './SkillMap'
 import { Practice } from './Practice'
 import { browserStore, loadProgress, saveProgress } from '@/lib/mastery/storage'
@@ -16,6 +17,12 @@ import type { ImplementedSkill } from '@/lib/problems'
 export function App() {
   const [progress, setProgress] = useState<Progress | null>(null)
   const [skill, setSkill] = useState<ImplementedSkill | null>(null)
+  /**
+   * Show the level check's result before the map. Two real learners sat the
+   * quiz and could not tell where it had put them, because it ended by dropping
+   * them straight onto the topic list.
+   */
+  const [showingResult, setShowingResult] = useState(false)
   /** Stamped when the map is shown, not read during render. */
   const [now, setNow] = useState(0)
 
@@ -38,7 +45,29 @@ export function App() {
   }
 
   if (!progress.placementDone) {
-    return <PlacementQuiz onDone={persist} />
+    return (
+      <PlacementQuiz
+        onDone={(placed) => {
+          // Saved immediately: closing the tab on the result screen must not
+          // mean sitting the whole quiz again.
+          persist(placed)
+          setShowingResult(true)
+        }}
+      />
+    )
+  }
+
+  if (showingResult) {
+    return (
+      <PlacementResult
+        progress={progress}
+        onContinue={() => { setNow(Date.now()); setShowingResult(false) }}
+        onRetake={() => {
+          setShowingResult(false)
+          persist({ ...progress, placed: [], placementDone: false })
+        }}
+      />
+    )
   }
 
   if (skill) {
