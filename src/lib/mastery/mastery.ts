@@ -45,6 +45,8 @@ export type Progress = {
    * nothing, and must not be handed the quiz again every time they open the app.
    */
   placementDone: boolean
+  /** Chosen session length. Absent means the default; see session/length.ts. */
+  sessionLength?: number
 }
 
 export const emptyProgress = (): Progress => ({

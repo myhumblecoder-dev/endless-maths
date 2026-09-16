@@ -5,6 +5,7 @@ import { SKILLS, SKILL_BY_ID } from '@/lib/curriculum/skills'
 import { GENERATORS, type ImplementedSkill } from '@/lib/problems'
 import { isSkillMastered, skillProgress, type Progress } from '@/lib/mastery/mastery'
 import { blockedBy, unlockedSkills, weakestDueFirst } from '@/lib/session/scheduler'
+import { SESSION_LENGTHS, sessionLengthOf } from '@/lib/session/length'
 import type { Strand } from '@/lib/curriculum/types'
 
 const STRAND_LABEL: Record<Strand, string> = {
@@ -26,11 +27,14 @@ export function SkillMap({
   progress,
   onPick,
   onRetakePlacement,
+  onSessionLength,
   now,
 }: {
   progress: Progress
   onPick: (skill: ImplementedSkill) => void
   onRetakePlacement: () => void
+  /** Change how many questions a session runs for. */
+  onSessionLength?: (length: number) => void
   /**
    * The clock, for working out what is due. Passed in rather than read here —
    * calling Date.now() during render is impure and makes the component
@@ -151,6 +155,38 @@ export function SkillMap({
       <p className="mt-8 text-center text-sm text-slate-400 dark:text-slate-500">
         ✓ done · ● ready · ○ not yet
       </p>
+
+      {/*
+        Twenty was a guess. A short run before school and a longer one at the
+        weekend are different things, so it is a choice — see length.ts.
+      */}
+      {onSessionLength && (
+        <div className="mt-8">
+          <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+            Session length
+          </p>
+          <div className="mt-2 flex gap-2" role="group" aria-label="Session length">
+            {SESSION_LENGTHS.map((length) => {
+              const current = sessionLengthOf(progress) === length
+              return (
+                <button
+                  key={length}
+                  type="button"
+                  aria-pressed={current}
+                  onClick={() => onSessionLength(length)}
+                  className={`h-11 flex-1 rounded-xl text-sm font-semibold transition ${
+                    current
+                      ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700'
+                  }`}
+                >
+                  {length} questions
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       {/*
         Placement is one snapshot, so a bad day can strand a learner at a level

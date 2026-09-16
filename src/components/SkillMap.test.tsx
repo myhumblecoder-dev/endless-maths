@@ -163,3 +163,24 @@ test('accuracy is in the accessible name too', () => {
   render(<SkillMap progress={p} onPick={() => {}} onRetakePlacement={() => {}} now={0} />)
   expect(screen.getByRole('button', { name: /^Number bonds to 10.*80%/ })).toBeTruthy()
 })
+
+// ---- session length -------------------------------------------------------
+
+test('the session length can be chosen and is highlighted', () => {
+  const onLength = vi.fn()
+  render(<SkillMap progress={placed()} onPick={() => {}} onRetakePlacement={() => {}}
+    onSessionLength={onLength} now={0} />)
+
+  const forty = screen.getByRole('button', { name: /40 questions/ })
+  fireEvent.click(forty)
+  assert.deepEqual(onLength.mock.calls, [[40]])
+})
+
+test('the current length is marked as selected', () => {
+  render(<SkillMap progress={{ ...placed(), sessionLength: 10 }} onPick={() => {}}
+    onRetakePlacement={() => {}} onSessionLength={() => {}} now={0} />)
+
+  const ten = screen.getByRole('button', { name: /10 questions/ })
+  assert.equal(ten.getAttribute('aria-pressed'), 'true')
+  assert.equal(screen.getByRole('button', { name: /20 questions/ }).getAttribute('aria-pressed'), 'false')
+})

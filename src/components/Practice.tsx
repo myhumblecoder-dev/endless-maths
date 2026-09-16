@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Keypad } from './Keypad'
 import { Maths } from './Maths'
-import { SESSION_LENGTH, answer as submitAnswer, completesProblem, currentProblem, isComplete, startSession, summary, type Session } from '@/lib/session/session'
+import { answer as submitAnswer, completesProblem, currentProblem, isComplete, startSession, summary, type Session } from '@/lib/session/session'
 import { canSubmit as entryCanSubmit, choiceForKey, isEntryKey, press } from '@/lib/session/keypad'
 import type { Verdict } from '@/lib/curriculum/types'
 import { feedbackText, formatAnswer } from '@/lib/problems/format'
@@ -251,7 +251,7 @@ export function Practice({ skill, progress, onProgress, onLeave, onPickSkill, se
           >
             ← {label}
           </button>
-          <span>{session.index + 1} / {SESSION_LENGTH}</span>
+          <span>{session.index + 1} / {session.problems.length}</span>
         </div>
 
         {/*
@@ -266,7 +266,7 @@ export function Practice({ skill, progress, onProgress, onLeave, onPickSkill, se
         <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
           <div
             className="h-full rounded-full bg-emerald-500 transition-all duration-300"
-            style={{ width: `${(session.index / SESSION_LENGTH) * 100}%` }}
+            style={{ width: `${(session.index / session.problems.length) * 100}%` }}
           />
         </div>
       </div>
