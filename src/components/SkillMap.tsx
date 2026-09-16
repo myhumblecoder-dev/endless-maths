@@ -28,6 +28,8 @@ export function SkillMap({
   onPick,
   onRetakePlacement,
   onSessionLength,
+  onSwitchProfile,
+  profileName,
   now,
 }: {
   progress: Progress
@@ -35,6 +37,10 @@ export function SkillMap({
   onRetakePlacement: () => void
   /** Change how many questions a session runs for. */
   onSessionLength?: (length: number) => void
+  /** Hand the device to the other child. */
+  onSwitchProfile?: () => void
+  /** Whose journey this is. Local only — never leaves the device. */
+  profileName?: string
   /**
    * The clock, for working out what is due. Passed in rather than read here —
    * calling Date.now() during render is impure and makes the component
@@ -59,7 +65,19 @@ export function SkillMap({
 
   return (
     <main className="mx-auto min-h-dvh max-w-md p-5">
-      <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-50">Topics</h1>
+      <div className="flex items-start justify-between gap-3">
+        <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-50">Topics</h1>
+        {onSwitchProfile && (
+          <button
+            type="button"
+            onClick={onSwitchProfile}
+            className="rounded-xl px-3 py-2 text-sm font-semibold text-slate-500 transition
+                       hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
+          >
+            {profileName ? `${profileName} · Switch` : 'Switch'}
+          </button>
+        )}
+      </div>
       <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
         Every session is mostly the topic you pick, mixed with review of things you have done before.
       </p>
