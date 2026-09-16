@@ -8,6 +8,16 @@ import type { Answer, Problem, SkillId } from '@/lib/curriculum/types'
 export const int = (value: number): Answer => ({ kind: 'integer', value })
 
 /**
+ * A number as it appears in a PROMPT, with a typographic minus.
+ *
+ * `formatAnswer` already writes answers this way. Prompts were interpolating
+ * negatives with a bare `${n}`, so `−3x − 10 = -28` put a hyphen and a minus
+ * on the same line — the same idea in two different characters, in a subject
+ * where the character IS the meaning.
+ */
+export const numeral = (n: number): string => (n < 0 ? `−${Math.abs(n)}` : `${n}`)
+
+/**
  * Build a decimal answer from a SCALED INTEGER, never from float arithmetic.
  *
  * `0.1 + 0.2` is `0.30000000000000004`, so every decimal skill computes in

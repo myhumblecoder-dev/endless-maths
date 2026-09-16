@@ -1,5 +1,6 @@
-import type { Generator, Rng } from '@/lib/curriculum/types'
+import type { Difficulty, Generator, Rng } from '@/lib/curriculum/types'
 import { pick, pickFrom, until } from './rng'
+import { band, pickBand, pickFromBand, rangeBand } from './difficulty'
 import { choice, dec, int, problem } from './build'
 import { gcd, simplify } from './fraction'
 
@@ -10,6 +11,16 @@ import { gcd, simplify } from './fraction'
 const DENOMINATORS = [2, 3, 4, 5, 6, 7, 8, 9, 10, 12] as const
 
 /**
+ * Difficulty in this strand is the DENOMINATOR, not the numerator.
+ *
+ * Halves, quarters and fifths are the ones a child already pictures; sevenths
+ * and ninths are the ones with no mental image to fall back on. Making the
+ * numbers on top bigger would not have changed the work at all.
+ */
+const denominatorsFor = (level: Difficulty): readonly number[] =>
+  band<readonly number[]>(level, [2, 3, 4, 5, 6, 8], DENOMINATORS, [7, 8, 9, 10, 12])
+
+/**
  * Naming a fraction needs the answer already in lowest terms, which thins the
  * pool badly on small denominators — 4 offers only 1/4 and 3/4. Sevenths and
  * ninths are there to widen it, since a session of twenty refuses to repeat a
@@ -17,10 +28,10 @@ const DENOMINATORS = [2, 3, 4, 5, 6, 7, 8, 9, 10, 12] as const
  */
 
 /** A proper fraction already in lowest terms. */
-function properSimplified(rng: Rng): { num: number; den: number } {
+function properSimplified(rng: Rng, dens: readonly number[] = DENOMINATORS): { num: number; den: number } {
   return until(
     () => {
-      const den = pickFrom(rng, DENOMINATORS)
+      const den = pickFrom(rng, dens)
       return { num: pick(rng, 1, den - 1), den }
     },
     ({ num, den }) => gcd(num, den) === 1,
@@ -45,9 +56,9 @@ export const fIdentify: Generator = (rng: Rng) => {
  * the expected answer would grade as `equivalent-unsimplified` against itself.
  * A missing numerator sidesteps that entirely, and is how textbooks ask it.
  */
-export const fEquivalent: Generator = (rng: Rng) => {
-  const { num, den } = properSimplified(rng)
-  const factor = pick(rng, 2, 5)
+export const fEquivalent: Generator = (rng: Rng, level: Difficulty = 'medium') => {
+  const { num, den } = properSimplified(rng, denominatorsFor(level))
+  const factor = pickBand(rng, level, [2, 3], [2, 5], [4, 7])
   return problem(
     'f-equivalent',
     `${num}/${den} = ?/${den * factor}`,
@@ -61,15 +72,18 @@ export const fEquivalent: Generator = (rng: Rng) => {
  * the same-denominator case is a different mental move from finding a common
  * one, and a learner needs both.
  */
-export const fCompare: Generator = (rng: Rng) => {
-  const sameDenominator = rng() < 0.4
+export const fCompare: Generator = (rng: Rng, level: Difficulty = 'medium') => {
+  // Simple compares like denominators most of the time — one glance at the
+  // numerators. Difficult almost never does.
+  const sameDenominator = rng() < band(level, 0.75, 0.4, 0.05)
+  const dens = denominatorsFor(level)
 
   const [a, b] = until(
     () => {
-      const first = properSimplified(rng)
+      const first = properSimplified(rng, dens)
       const second = sameDenominator
         ? { num: pick(rng, 1, first.den - 1), den: first.den }
-        : properSimplified(rng)
+        : properSimplified(rng, dens)
       return [first, second] as const
     },
     // An occasional equal pair is worth meeting; a stream of them is not.
@@ -99,8 +113,8 @@ export const fCompare: Generator = (rng: Rng) => {
  */
 const LIKE_DENOMINATORS = DENOMINATORS.filter((d) => d >= 3)
 
-function likeParts(rng: Rng, subtract: boolean): { a: number; b: number; den: number } {
-  const den = pickFrom(rng, LIKE_DENOMINATORS)
+function likeParts(rng: Rng, subtract: boolean, level: Difficulty): { a: number; b: number; den: number } {
+  const den = pickFromBand(rng, level, [3, 4, 5, 6, 7], LIKE_DENOMINATORS, [8, 9, 10, 12])
   return subtract
     // a > b keeps the result positive; negatives are a separate skill entirely.
     ? (() => {
@@ -113,8 +127,8 @@ function likeParts(rng: Rng, subtract: boolean): { a: number; b: number; den: nu
       })()
 }
 
-export const fAddLike: Generator = (rng: Rng) => {
-  const { a, b, den } = likeParts(rng, false)
+export const fAddLike: Generator = (rng: Rng, level: Difficulty = 'medium') => {
+  const { a, b, den } = likeParts(rng, false, level)
   const answer = simplify(a + b, den)
   return problem(
     'f-add-like',
@@ -124,8 +138,8 @@ export const fAddLike: Generator = (rng: Rng) => {
   )
 }
 
-export const fSubLike: Generator = (rng: Rng) => {
-  const { a, b, den } = likeParts(rng, true)
+export const fSubLike: Generator = (rng: Rng, level: Difficulty = 'medium') => {
+  const { a, b, den } = likeParts(rng, true, level)
   const answer = simplify(a - b, den)
   return problem(
     'f-sub-like',
@@ -146,7 +160,12 @@ export const fSubLike: Generator = (rng: Rng) => {
  */
 const UNLIKE_LCM_LIMIT = 24
 
-export const fAddUnlike: Generator = (rng: Rng) => {
+export const fAddUnlike: Generator = (rng: Rng, level: Difficulty = 'medium') => {
+  // The common denominator is the difficulty here. Simple keeps it to 12 —
+  // halves, thirds and quarters, where the shared denominator is one a child
+  // can see — while difficult insists on one they have to work out.
+  const [lcmFloor, lcmCeiling] = rangeBand(level, [0, 12], [0, UNLIKE_LCM_LIMIT], [13, UNLIKE_LCM_LIMIT])
+
   const { a, d1, b, d2 } = until(
     () => {
       const first = properSimplified(rng)
@@ -155,7 +174,8 @@ export const fAddUnlike: Generator = (rng: Rng) => {
     },
     ({ a, d1, b, d2 }) =>
       d1 !== d2 &&
-      (d1 * d2) / gcd(d1, d2) <= UNLIKE_LCM_LIMIT &&
+      (d1 * d2) / gcd(d1, d2) >= lcmFloor &&
+      (d1 * d2) / gcd(d1, d2) <= lcmCeiling &&
       // Keep the result proper: a/d1 + b/d2 <= 1.
       a * d2 + b * d1 <= d1 * d2,
   )
@@ -177,9 +197,10 @@ export const fAddUnlike: Generator = (rng: Rng) => {
  * fraction — that is honest to the maths, and `formatAnswer` writes a
  * denominator of 1 as a plain whole number.
  */
-export const fMultiply: Generator = (rng: Rng) => {
-  const first = properSimplified(rng)
-  const second = properSimplified(rng)
+export const fMultiply: Generator = (rng: Rng, level: Difficulty = 'medium') => {
+  const dens = denominatorsFor(level)
+  const first = properSimplified(rng, dens)
+  const second = properSimplified(rng, dens)
   const answer = simplify(first.num * second.num, first.den * second.den)
   return problem(
     'f-multiply',
@@ -189,9 +210,10 @@ export const fMultiply: Generator = (rng: Rng) => {
   )
 }
 
-export const fDivide: Generator = (rng: Rng) => {
-  const first = properSimplified(rng)
-  const second = properSimplified(rng)
+export const fDivide: Generator = (rng: Rng, level: Difficulty = 'medium') => {
+  const dens = denominatorsFor(level)
+  const first = properSimplified(rng, dens)
+  const second = properSimplified(rng, dens)
   // Dividing by b/d is multiplying by d/b.
   const answer = simplify(first.num * second.den, first.den * second.num)
   return problem(
@@ -212,10 +234,12 @@ export const fDivide: Generator = (rng: Rng) => {
  */
 const CONVERTIBLE_DENOMINATORS = [2, 4, 5, 10, 20, 25, 50] as const
 
-export const fConvertFdp: Generator = (rng: Rng) => {
+export const fConvertFdp: Generator = (rng: Rng, level: Difficulty = 'medium') => {
   const { num, den } = until(
     () => {
-      const den = pickFrom(rng, CONVERTIBLE_DENOMINATORS)
+      // Halves, quarters and tenths are the conversions worth knowing by heart;
+      // twentieths and fiftieths are the ones that need working out.
+      const den = pickFromBand(rng, level, [2, 4, 5, 10], CONVERTIBLE_DENOMINATORS, [20, 25, 50])
       return { num: pick(rng, 1, den - 1), den }
     },
     ({ num, den }) => gcd(num, den) === 1,
@@ -226,7 +250,7 @@ export const fConvertFdp: Generator = (rng: Rng) => {
   // quietly hints at the shape of the answer.
   const places = hundredths % 10 === 0 ? 1 : 2
   const asDecimal = (hundredths / 100).toFixed(places)
-  const direction = pickFrom(rng, ['decimal', 'percent', 'fromDecimal', 'fromPercent'] as const)
+  const direction = pickFrom(rng, ['decimal', 'percent', 'fromDecimal', 'fromPercent'])
   const operands = [num, den]
 
   switch (direction) {

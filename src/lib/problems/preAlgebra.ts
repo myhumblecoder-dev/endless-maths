@@ -1,7 +1,8 @@
-import type { Generator, Rng } from '@/lib/curriculum/types'
-import { pick, pickFrom } from './rng'
+import type { Difficulty, Generator, Rng } from '@/lib/curriculum/types'
+import { pick } from './rng'
+import { band, pickBand, pickFromBand } from './difficulty'
 import { linear } from './expression'
-import { dec, int, problem } from './build'
+import { dec, int, numeral, problem } from './build'
 
 /**
  * Every equation here is built BACKWARDS: pick the solution first, then
@@ -11,6 +12,11 @@ import { dec, int, problem } from './build'
  * The consequence is that solving two-step equations costs the same to build
  * as two-digit addition. Pre-algebra is not the expensive part of this
  * curriculum; fractions are. See docs/design.md.
+ *
+ * Difficulty here is about SIGNS, not size. `3x + 7 = 22` and `3x + 9 = 27` are
+ * the same question; `−3x + 7 = 22` is a different one, and it is where the
+ * mistakes live. So simple keeps everything positive and difficult reaches
+ * deliberately for the negative coefficient.
  */
 
 /** Renders a coefficient the way a human writes it: `x`, not `1x`. */
@@ -24,34 +30,42 @@ const term = (coefficient: number): string => {
 /** Renders `+ 4` / `− 4` rather than `+ -4`. */
 const signed = (n: number): string => `${n < 0 ? '−' : '+'} ${Math.abs(n)}`
 
-export const pEvaluate: Generator = (rng: Rng) => {
-  const a = pick(rng, 2, 9)
-  const b = pick(rng, 1, 20)
-  const x = pick(rng, 2, 12)
+
+export const pEvaluate: Generator = (rng: Rng, level: Difficulty = 'medium') => {
+  const a = pickBand(rng, level, [2, 5], [2, 9], [6, 12])
+  const b = pickBand(rng, level, [1, 9], [1, 20], [11, 30])
+  const x = pickBand(rng, level, [2, 5], [2, 12], [7, 15])
   return problem('p-evaluate', `${term(a)} + ${b}   when x = ${x}`, int(a * x + b), [a, b, x])
 }
 
-export const pSolveOneStep: Generator = (rng: Rng) => {
-  const x = pick(rng, 1, 20)
-  const b = pick(rng, 1, 30)
+export const pSolveOneStep: Generator = (rng: Rng, level: Difficulty = 'medium') => {
+  const x = pickBand(rng, level, [1, 9], [1, 20], [12, 40])
+  const b = pickBand(rng, level, [1, 9], [1, 30], [15, 50])
   return rng() < 0.5
-    ? problem('p-solve-one-step', `x + ${b} = ${x + b}`, int(x), [b, x])
-    : problem('p-solve-one-step', `x − ${b} = ${x - b}`, int(x), [b, x])
+    ? problem('p-solve-one-step', `x + ${b} = ${numeral(x + b)}`, int(x), [b, x])
+    : problem('p-solve-one-step', `x − ${b} = ${numeral(x - b)}`, int(x), [b, x])
 }
 
-export const pSolveTwoStep: Generator = (rng: Rng) => {
-  const x = pick(rng, 1, 12)
-  const a = pick(rng, 2, 9)
-  const b = pick(rng, -10, 20)
-  return problem('p-solve-two-step', `${term(a)} ${signed(b)} = ${a * x + b}`, int(x), [a, b, x])
+/**
+ * Simple stays entirely positive. Difficult reaches for a negative coefficient,
+ * which is the version that goes wrong — `−3x + 7 = 22` asks a child to divide
+ * by a negative, and dividing by a negative is where two-step equations stop
+ * being mechanical.
+ */
+export const pSolveTwoStep: Generator = (rng: Rng, level: Difficulty = 'medium') => {
+  const x = pickBand(rng, level, [1, 8], [1, 12], [2, 15])
+  const magnitude = pickBand(rng, level, [2, 5], [2, 9], [3, 9])
+  const a = rng() < band(level, 0, 0, 0.6) ? -magnitude : magnitude
+  const b = pickBand(rng, level, [1, 12], [-10, 20], [-25, -1])
+  return problem('p-solve-two-step', `${term(a)} ${signed(b)} = ${numeral(a * x + b)}`, int(x), [a, b, x])
 }
 
 /** Coefficients kept apart (a1 > a2) so the equation has a unique solution. */
-export const pSolveBothSides: Generator = (rng: Rng) => {
-  const x = pick(rng, 1, 12)
-  const a2 = pick(rng, 1, 3)
-  const a1 = pick(rng, a2 + 1, 9)
-  const b1 = pick(rng, 1, 15)
+export const pSolveBothSides: Generator = (rng: Rng, level: Difficulty = 'medium') => {
+  const x = pickBand(rng, level, [1, 6], [1, 12], [5, 15])
+  const a2 = pickBand(rng, level, [1, 2], [1, 3], [2, 5])
+  const a1 = pick(rng, a2 + 1, band(level, 5, 9, 12))
+  const b1 = pickBand(rng, level, [1, 8], [1, 15], [9, 30])
   const b2 = (a1 - a2) * x + b1
   return problem(
     'p-solve-both-sides',
@@ -62,9 +76,11 @@ export const pSolveBothSides: Generator = (rng: Rng) => {
 }
 
 /** Perimeter and area of a rectangle — a formula with a decimal side length. */
-export const pFormula: Generator = (rng: Rng) => {
-  const wScaled = pick(rng, 15, 95) // 1.5 to 9.5
-  const h = pick(rng, 2, 9)
+/** Simple uses whole centimetres, so the decimal is not a second obstacle. */
+export const pFormula: Generator = (rng: Rng, level: Difficulty = 'medium') => {
+  // Lazy, so each level draws once rather than three times.
+  const wScaled = band(level, () => pick(rng, 2, 9) * 10, () => pick(rng, 15, 95), () => pick(rng, 55, 95))()
+  const h = pickBand(rng, level, [2, 5], [2, 9], [6, 12])
   return rng() < 0.5
     ? problem('p-formula', `Area of a rectangle ${(wScaled / 10).toFixed(1)}cm by ${h}cm`, dec(wScaled * h, 1), [wScaled, h])
     : problem('p-formula', `Perimeter of a rectangle ${(wScaled / 10).toFixed(1)}cm by ${h}cm`, dec(2 * (wScaled + h * 10), 1), [wScaled, h])
@@ -78,12 +94,14 @@ export const pFormula: Generator = (rng: Rng) => {
  * separate solver to go wrong. Always poses something that genuinely needs
  * collecting.
  */
-export const pLikeTerms: Generator = (rng: Rng) => {
-  const a = pick(rng, 2, 9)
-  const b = pick(rng, 1, 9)
-  const c = pick(rng, 1, 12)
-  const d = pick(rng, 1, 12)
-  const subtractX = rng() < 0.35 && a > b
+export const pLikeTerms: Generator = (rng: Rng, level: Difficulty = 'medium') => {
+  const a = pickBand(rng, level, [2, 5], [2, 9], [6, 12])
+  const b = pickBand(rng, level, [1, 4], [1, 9], [1, 5])
+  const c = pickBand(rng, level, [1, 6], [1, 12], [7, 20])
+  const d = pickBand(rng, level, [1, 6], [1, 12], [7, 20])
+  // A subtracted x term is the part that catches people out, so simple never
+  // poses one and difficult nearly always does.
+  const subtractX = rng() < band(level, 0, 0.35, 0.8) && a > b
 
   const xTotal = subtractX ? a - b : a + b
   const constant = c + d
@@ -103,10 +121,13 @@ export const pLikeTerms: Generator = (rng: Rng) => {
  * the sign on the second term is the classic slip at this level, and a run of
  * positive multipliers would never meet it.
  */
-export const pDistribute: Generator = (rng: Rng) => {
-  const outside = pickFrom(rng, [2, 3, 4, 5, 6, -2, -3, -4])
-  const inner = pick(rng, 1, 9)
-  const constant = pick(rng, 1, 12) * (rng() < 0.3 ? -1 : 1)
+export const pDistribute: Generator = (rng: Rng, level: Difficulty = 'medium') => {
+  // Simple never goes negative on either side: the skill at that level is
+  // "multiply both terms", not "and mind the signs".
+  const outside = pickFromBand(rng, level, [2, 3, 4], [2, 3, 4, 5, 6, -2, -3, -4], [-2, -3, -4, -5, 6])
+  const inner = pickBand(rng, level, [1, 5], [1, 9], [4, 12])
+  const constant = pickBand(rng, level, [1, 6], [1, 12], [7, 20])
+    * (rng() < band(level, 0, 0.3, 0.7) ? -1 : 1)
 
   const sign = constant < 0 ? '−' : '+'
 
@@ -135,24 +156,25 @@ const RELATIONS = ['<', '>', '<=', '>='] as const
 const flip = (relation: string): string =>
   relation.startsWith('<') ? relation.replace('<', '>') : relation.replace('>', '<')
 
-export const pInequalities: Generator = (rng: Rng) => {
-  const boundary = pick(rng, -6, 9)
-  const magnitude = pick(rng, 2, 9)
-  const negative = rng() < 0.45
+export const pInequalities: Generator = (rng: Rng, level: Difficulty = 'medium') => {
+  const boundary = pickBand(rng, level, [1, 9], [-6, 9], [-12, -1])
+  const magnitude = pickBand(rng, level, [2, 5], [2, 9], [3, 9])
+  // The flip only happens when the coefficient is negative, so simple — which
+  // never has one — never meets it, and difficult meets it most of the time.
+  const negative = rng() < band(level, 0, 0.45, 0.8)
   const a = negative ? -magnitude : magnitude
-  const b = pick(rng, -10, 20)
-  const relation = pickFrom(rng, RELATIONS)
+  const b = pickBand(rng, level, [1, 12], [-10, 20], [-25, -1])
+  const relation = pickFromBand(rng, level, ['<', '>'] as const, RELATIONS, RELATIONS)
 
   // With c = a*boundary + b, the inequality is true exactly at the boundary.
   const c = a * boundary + b
   const answer = `x${negative ? flip(relation) : relation}${boundary}`
 
   const relationSymbol = relation === '<=' ? '≤' : relation === '>=' ? '≥' : relation
-  const rhs = c < 0 ? `−${Math.abs(c)}` : `${c}`
 
   return problem(
     'p-inequalities',
-    `Solve ${term(a)} ${signed(b)} ${relationSymbol} ${rhs}`,
+    `Solve ${term(a)} ${signed(b)} ${relationSymbol} ${numeral(c)}`,
     { kind: 'expression', canonical: answer },
     [a, b, boundary],
   )

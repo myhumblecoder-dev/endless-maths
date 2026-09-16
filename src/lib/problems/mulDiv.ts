@@ -1,5 +1,6 @@
-import type { Generator, Rng, SkillId } from '@/lib/curriculum/types'
+import type { Difficulty, Generator, Rng, SkillId } from '@/lib/curriculum/types'
 import { pick, pickFrom } from './rng'
+import { pickBand, rangeBand } from './difficulty'
 import { int, problem } from './build'
 
 /**
@@ -38,9 +39,14 @@ export const mDiv2510 = divTable('m-div-2-5-10', [2, 5, 10])
 export const mDiv34 = divTable('m-div-3-4', [3, 4])
 export const mDiv6789 = divTable('m-div-6-7-8-9', [6, 7, 8, 9])
 
-export const m2DigitBy1Digit: Generator = (rng: Rng) => {
-  const a = pick(rng, 12, 99)
-  const b = pick(rng, 3, 9)
+/**
+ * The single-digit multiplier is what does the work here: the level moves it
+ * into the tables a child is least sure of, rather than only growing the
+ * two-digit number.
+ */
+export const m2DigitBy1Digit: Generator = (rng: Rng, level: Difficulty = 'medium') => {
+  const a = pickBand(rng, level, [12, 29], [12, 99], [45, 99])
+  const b = pickBand(rng, level, [2, 5], [3, 9], [6, 9])
   return problem('m-2digit-x-1digit', `${a} × ${b}`, int(a * b), [a, b])
 }
 
@@ -52,9 +58,9 @@ export const m2DigitBy1Digit: Generator = (rng: Rng) => {
  * at least 1 — a remainder of zero is exact division, which is a different
  * skill the learner has already met.
  */
-export const mDivRemainder: Generator = (rng: Rng) => {
-  const divisor = pick(rng, 3, 12)
-  const quotient = pick(rng, 2, 20)
+export const mDivRemainder: Generator = (rng: Rng, level: Difficulty = 'medium') => {
+  const divisor = pickBand(rng, level, [3, 5], [3, 12], [7, 12])
+  const quotient = pickBand(rng, level, [2, 9], [2, 20], [11, 30])
   const remainder = pick(rng, 1, divisor - 1)
   const dividend = divisor * quotient + remainder
   return problem(
@@ -74,14 +80,15 @@ export const mDivRemainder: Generator = (rng: Rng) => {
  * mentally has not demonstrated the thing the curriculum is asking for. A
  * proper version needs step-by-step layout entry — deferred.
  */
-export const mLongMult: Generator = (rng: Rng) => {
-  const a = pick(rng, 12, 99)
-  const b = pick(rng, 12, 99)
+export const mLongMult: Generator = (rng: Rng, level: Difficulty = 'medium') => {
+  const range = rangeBand(level, [12, 29], [12, 99], [45, 99])
+  const a = pick(rng, ...range)
+  const b = pick(rng, ...range)
   return problem('m-long-mult', `${a} × ${b}`, int(a * b), [a, b])
 }
 
-export const mLongDiv: Generator = (rng: Rng) => {
-  const divisor = pick(rng, 12, 25)
-  const quotient = pick(rng, 11, 99)
+export const mLongDiv: Generator = (rng: Rng, level: Difficulty = 'medium') => {
+  const divisor = pickBand(rng, level, [12, 15], [12, 25], [16, 25])
+  const quotient = pickBand(rng, level, [11, 29], [11, 99], [40, 99])
   return problem('m-long-div', `${divisor * quotient} ÷ ${divisor}`, int(quotient), [divisor * quotient, divisor])
 }

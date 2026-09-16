@@ -8,7 +8,7 @@
  *  - counting to 20 (needs a visual counting interface)
  */
 
-import type { Generator, Problem, Rng, SkillId } from '@/lib/curriculum/types'
+import type { Difficulty, Generator, Problem, Rng, SkillId } from '@/lib/curriculum/types'
 import * as ns from './numberSense'
 import * as as from './addSub'
 import * as md from './mulDiv'
@@ -83,8 +83,13 @@ export type ImplementedSkill = keyof typeof GENERATORS
 
 export const IMPLEMENTED = Object.keys(GENERATORS) as ImplementedSkill[]
 
-export function generate(skill: ImplementedSkill, rng: Rng): Problem {
-  return GENERATORS[skill](rng)
+/**
+ * Omitting the level asks the topic at `medium`, which is how every call site
+ * that predates difficulty already behaved.
+ */
+export function generate(skill: ImplementedSkill, rng: Rng, level?: Difficulty): Problem {
+  return GENERATORS[skill](rng, level)
 }
 
 export { seeded } from './rng'
+export { DIFFICULTIES, DEFAULT_DIFFICULTY, easier, harder, isVaried } from './difficulty'
