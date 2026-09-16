@@ -144,3 +144,18 @@ export function canSubmit(entry: Entry, answer: Answer): boolean {
       return /^-?\d*\.?\d*$/.test(entry) && /\d$/.test(entry)
   }
 }
+
+/**
+ * The option a key selects, for answers that are a choice rather than typed.
+ *
+ * A symbol option is picked by pressing it; a word option by its first letter.
+ * Without this, a comparison question could only be answered with a mouse —
+ * which is most of the way to unusable on a laptop.
+ */
+export function choiceForKey(key: string, answer: Answer): string | undefined {
+  if (answer.kind !== 'choice') return undefined
+  const pressed = key.toLowerCase()
+  return answer.options.find(
+    (option) => option.toLowerCase() === pressed || option[0].toLowerCase() === pressed,
+  )
+}
