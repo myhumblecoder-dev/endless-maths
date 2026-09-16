@@ -23,12 +23,32 @@ import type { ImplementedSkill } from '@/lib/problems'
  * meant two children overwrote each other.
  */
 
-/** `localStorage` when there is a window, otherwise a no-op for SSR. */
+const NO_STORE: ProfileStore = {
+  getItem: () => null, setItem: () => {}, removeItem: () => {}, keys: () => [],
+}
+
+/**
+ * `localStorage` when it is available.
+ *
+ * Absent during server rendering, and **reading the property itself throws** in
+ * Safari with cookies blocked or inside a sandboxed iframe. That throw happened
+ * outside every try/catch downstream, so a blocked store meant the crash screen
+ * on every single load.
+ */
 function browserProfileStore(): ProfileStore {
-  if (typeof window === 'undefined') {
-    return { getItem: () => null, setItem: () => {}, removeItem: () => {} }
+  if (typeof window === 'undefined') return NO_STORE
+  try {
+    const store = window.localStorage
+    return {
+      getItem: (k) => store.getItem(k),
+      setItem: (k, v) => store.setItem(k, v),
+      removeItem: (k) => store.removeItem(k),
+      keys: () => Object.keys(store),
+    }
+  } catch {
+    // Practice still works; nothing is remembered between sessions.
+    return NO_STORE
   }
-  return window.localStorage
 }
 
 /** The one profile's progress, addressed by its own key. */
@@ -89,7 +109,13 @@ export function App() {
     return (
       <ProfilePicker
         state={profiles}
-        onChoose={(id) => persistProfiles({ ...profiles, activeId: id })}
+        onChoose={(id) => {
+          // Re-stamp the clock: handing the device over in the evening and
+          // choosing the next morning would otherwise work out what is due
+          // against yesterday.
+          setNow(Date.now())
+          persistProfiles({ ...profiles, activeId: id })
+        }}
         onAdd={(name) =>
           persistProfiles(
             // Only the FIRST profile adopts the record left from before

@@ -4,6 +4,7 @@ import assert from 'node:assert/strict'
 import { render, screen, fireEvent, cleanup } from '@testing-library/react'
 import { SafeScreen } from './SafeScreen'
 import { STORAGE_KEY } from '@/lib/mastery/storage'
+import { PROFILES_KEY, progressKeyFor } from '@/lib/mastery/profiles'
 
 afterEach(cleanup)
 
@@ -48,4 +49,24 @@ test('starting again clears the saved progress that may have caused it', () => {
 
   fireEvent.click(screen.getByRole('button', { name: /Start again/i }))
   assert.equal(localStorage.getItem(STORAGE_KEY), null, 'bad progress must not survive the reset')
+})
+
+/**
+ * The crash screen exists to break a loop. It was clearing the old single key,
+ * which nothing writes to since profiles landed — so "Start again" reloaded
+ * straight back into the record that threw.
+ */
+test('starting again clears the journey that is actually in use', () => {
+  localStorage.setItem(PROFILES_KEY, JSON.stringify({
+    profiles: [{ id: 'p1', name: 'Eddie' }], activeId: 'p1',
+  }))
+  localStorage.setItem(progressKeyFor('p1'), '{"broken":true}')
+
+  render(<SafeScreen><Boom /></SafeScreen>)
+  const reload = vi.fn()
+  vi.spyOn(window, 'location', 'get').mockReturnValue({ ...window.location, reload } as Location)
+  fireEvent.click(screen.getByRole('button', { name: /Start again/i }))
+
+  assert.equal(localStorage.getItem(progressKeyFor('p1')), null,
+    'the record that caused the crash must not survive the reset')
 })
