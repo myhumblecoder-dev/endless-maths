@@ -44,13 +44,20 @@ function effectivePrereqs(id: SkillId, seen = new Set<SkillId>()): ImplementedSk
  * a skill that does not exist.
  */
 export function blockedBy(progress: Progress, skill: SkillId): ImplementedSkill[] {
+  // Nothing blocks a skill the learner has already mastered.
+  if (isSkillMastered(progress, skill)) return []
   return effectivePrereqs(skill).filter((req) => !isSkillMastered(progress, req))
 }
 
 /** Skills the learner has earned the right to meet. */
 export function unlockedSkills(progress: Progress): ImplementedSkill[] {
-  return (Object.keys(GENERATORS) as ImplementedSkill[]).filter((id) =>
-    effectivePrereqs(id).every((req) => isSkillMastered(progress, req)),
+  return (Object.keys(GENERATORS) as ImplementedSkill[]).filter(
+    (id) =>
+      // Taking away a skill they have already demonstrated would be absurd —
+      // reachable once practice could overturn a placement, because then a
+      // prerequisite can regress underneath something already mastered.
+      isSkillMastered(progress, id) ||
+      effectivePrereqs(id).every((req) => isSkillMastered(progress, req)),
   )
 }
 

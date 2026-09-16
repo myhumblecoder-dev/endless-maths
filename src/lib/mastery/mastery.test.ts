@@ -1,6 +1,7 @@
 import { test } from 'vitest'
 import assert from 'node:assert/strict'
 import {
+  skillProgress,
   emptyProgress,
   record,
   factMedianMs,
@@ -9,7 +10,8 @@ import {
   skillCorrectRate,
   FLUENCY_MS,
 } from './mastery'
-import type { Attempt } from '@/lib/curriculum/types'
+import type { Attempt, SkillId } from '@/lib/curriculum/types'
+import type { Progress } from './mastery'
 
 const attempt = (over: Partial<Attempt> = {}): Attempt => ({
   problemId: 'm-times-6-7-8-9#7,8',
@@ -111,4 +113,112 @@ test('a procedure with poor accuracy is not mastered', () => {
 
 test('an unseen skill is not mastered', () => {
   assert.equal(isSkillMastered(emptyProgress(), 'p-solve-two-step'), false)
+})
+
+// ---- progress worth looking at --------------------------------------------
+// A binary "done" tick is thin for an 11- to 13-year-old. Accuracy and whether
+// it is moving are what they can act on.
+
+const attempt10 = (skill: SkillId, verdicts: boolean[]): Progress => {
+  let p = emptyProgress()
+  verdicts.forEach((ok, i) => {
+    p = record(p, {
+      problemId: `${skill}#${i}`, skill,
+      given: 'x', verdict: ok ? 'correct' : 'incorrect',
+      elapsedMs: 2000, at: i,
+    })
+  })
+  return p
+}
+
+test('a skill never practised has nothing to report', () => {
+  assert.equal(skillProgress(emptyProgress(), 'm-times-6-7-8-9'), undefined)
+})
+
+test('accuracy is reported over the recent window', () => {
+  const p = attempt10('m-times-6-7-8-9', [true, true, true, true, false])
+  const s = skillProgress(p, 'm-times-6-7-8-9')!
+  assert.equal(s.attempts, 5)
+  assert.equal(Math.round(s.accuracy * 100), 80)
+})
+
+/**
+ * A lifetime average hides exactly what a learner wants to know. Someone who
+ * was at 40% and is now at 90% should see that, not a flat 65%.
+ */
+test('improving shows as improving', () => {
+  const p = attempt10('m-times-6-7-8-9',
+    [false, false, false, false, false, true, true, true, true, true])
+  assert.equal(skillProgress(p, 'm-times-6-7-8-9')!.trend, 'up')
+})
+
+test('slipping shows as slipping', () => {
+  const p = attempt10('m-times-6-7-8-9',
+    [true, true, true, true, true, false, false, false, false, false])
+  assert.equal(skillProgress(p, 'm-times-6-7-8-9')!.trend, 'down')
+})
+
+test('holding steady is not dressed up as movement', () => {
+  const p = attempt10('m-times-6-7-8-9',
+    [true, true, true, true, false, true, true, true, true, false])
+  assert.equal(skillProgress(p, 'm-times-6-7-8-9')!.trend, 'steady')
+})
+
+test('a trend is not claimed from too little data', () => {
+  const p = attempt10('m-times-6-7-8-9', [true, false, true])
+  assert.equal(skillProgress(p, 'm-times-6-7-8-9')!.trend, 'unknown',
+    'three answers is not a trend')
+})
+
+test('progress never leaves the device', () => {
+  // The whole record is a plain object in localStorage; nothing here fetches.
+  const p = attempt10('m-times-6-7-8-9', [true, true])
+  assert.deepEqual(JSON.parse(JSON.stringify(p)), p, 'progress must stay serialisable')
+})
+
+/**
+ * Placement is a claim; practice is evidence. Once there is enough evidence,
+ * it should win — otherwise a skill someone placed out of stays ticked "done"
+ * while they get 30% of it wrong, which is both wrong and visibly odd.
+ */
+test('real practice overrides what placement claimed', () => {
+  const placedOut: Progress = {
+    ...emptyProgress(),
+    placed: ['n-place-value-100'],
+    placementDone: true,
+  }
+  assert.equal(isSkillMastered(placedOut, 'n-place-value-100'), true, 'placed out of it')
+
+  let p = placedOut
+  for (let i = 0; i < 10; i++) {
+    p = record(p, {
+      problemId: `n-place-value-100#${i}`, skill: 'n-place-value-100',
+      given: 'x', verdict: i < 3 ? 'correct' : 'incorrect', elapsedMs: 3000, at: i,
+    })
+  }
+  assert.equal(isSkillMastered(p, 'n-place-value-100'), false,
+    '30% across ten attempts is not mastery, whatever the quiz said')
+})
+
+test('placement still stands until there is evidence against it', () => {
+  let p: Progress = { ...emptyProgress(), placed: ['n-place-value-100'], placementDone: true }
+  // A couple of wrong answers is not enough to overturn a placement.
+  for (let i = 0; i < 3; i++) {
+    p = record(p, {
+      problemId: `n-place-value-100#${i}`, skill: 'n-place-value-100',
+      given: 'x', verdict: 'incorrect', elapsedMs: 3000, at: i,
+    })
+  }
+  assert.equal(isSkillMastered(p, 'n-place-value-100'), true)
+})
+
+test('practising a placed skill well keeps it mastered', () => {
+  let p: Progress = { ...emptyProgress(), placed: ['n-place-value-100'], placementDone: true }
+  for (let i = 0; i < 10; i++) {
+    p = record(p, {
+      problemId: `n-place-value-100#${i}`, skill: 'n-place-value-100',
+      given: 'x', verdict: 'correct', elapsedMs: 1500, at: i,
+    })
+  }
+  assert.equal(isSkillMastered(p, 'n-place-value-100'), true)
 })

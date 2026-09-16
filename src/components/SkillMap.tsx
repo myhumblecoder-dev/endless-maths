@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { SKILLS, SKILL_BY_ID } from '@/lib/curriculum/skills'
 import { GENERATORS, type ImplementedSkill } from '@/lib/problems'
-import { isSkillMastered, type Progress } from '@/lib/mastery/mastery'
+import { isSkillMastered, skillProgress, type Progress } from '@/lib/mastery/mastery'
 import { blockedBy, unlockedSkills, weakestDueFirst } from '@/lib/session/scheduler'
 import type { Strand } from '@/lib/curriculum/types'
 
@@ -87,13 +87,28 @@ export function SkillMap({
                         .filter((label): label is string => Boolean(label))
                   const reason = blockers.length > 0 ? `After ${blockers.join(' and ')}` : ''
 
+                  /**
+                   * A binary tick is thin for this age group. Accuracy over the
+                   * trailing window, and whether it is moving, is what they can
+                   * act on — stated flatly, because the retrieval research is
+                   * clear that practice should not feel like constant judgement.
+                   */
+                  const stats = skillProgress(progress, skill.id)
+                  const TREND_WORD = { up: 'improving', down: 'slipping', steady: 'steady', unknown: '' }
+                  const figures = stats
+                    ? [`${Math.round(stats.accuracy * 100)}%`, TREND_WORD[stats.trend]]
+                        .filter(Boolean).join(' · ')
+                    : ''
+
                   return (
                     <li key={skill.id}>
                       <button
                         type="button"
                         disabled={!open}
                         onClick={() => onPick(skill.id as ImplementedSkill)}
-                        aria-label={`${skill.label}${open ? '' : ` (locked. ${reason})`}`}
+                        aria-label={
+                          `${skill.label}${figures ? `. ${figures}` : ''}${open ? '' : ` (locked. ${reason})`}`
+                        }
                         className={`flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-lg transition
                           ${open
                             ? 'bg-slate-100 text-slate-900 hover:bg-slate-200 active:scale-[0.99] dark:bg-slate-800 dark:text-slate-50 dark:hover:bg-slate-700'
@@ -109,13 +124,18 @@ export function SkillMap({
                               {reason}
                             </span>
                           )}
+                          {figures && (
+                            <span className="mt-0.5 block text-xs tabular-nums text-slate-400 dark:text-slate-500">
+                              {figures}
+                            </span>
+                          )}
                         </span>
                         {open && (dueCount.get(skill.id) ?? 0) > 0 && (
                           <span className="text-sm text-sky-600 dark:text-sky-400">
                             {dueCount.get(skill.id)} to review
                           </span>
                         )}
-                        {done && (dueCount.get(skill.id) ?? 0) === 0 && (
+                        {done && (dueCount.get(skill.id) ?? 0) === 0 && !figures && (
                           <span className="text-sm text-emerald-600 dark:text-emerald-400">done</span>
                         )}
                       </button>
