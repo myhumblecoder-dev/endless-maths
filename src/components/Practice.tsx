@@ -188,9 +188,19 @@ export function Practice({ skill, progress, onProgress, onLeave, onPickSkill, se
       <main className="mx-auto grid min-h-dvh max-w-md place-items-center p-6 text-center">
         <div className="w-full">
           <p className="text-6xl font-bold tabular-nums text-slate-900 dark:text-slate-50">
-            {stats.correct}<span className="text-slate-400 dark:text-slate-500">/{stats.total}</span>
+            {stats.correct}<span className="text-slate-400 dark:text-slate-500">/{stats.answered}</span>
           </p>
           <h1 className="mt-3 text-xl font-semibold text-slate-600 dark:text-slate-300">{label}</h1>
+          {/*
+            Reaching the cap is a deferral, not a failure, and not mercy either:
+            the topic is still their weakest and comes back. Saying "that's
+            enough for today" is the truth; "well done" would not be.
+          */}
+          <p className="mt-2 text-sm font-medium text-slate-500 dark:text-slate-400">
+            {stats.goal.reachedCap
+              ? "That's enough for today. We'll pick this one up again next time."
+              : 'Nine out of ten. That was the goal.'}
+          </p>
           {median !== null && (
             <p className="mt-1 text-sm text-slate-400 dark:text-slate-500">
               {(median / 1000).toFixed(1)}s per question
@@ -251,7 +261,13 @@ export function Practice({ skill, progress, onProgress, onLeave, onPickSkill, se
           >
             ← {label}
           </button>
-          <span>{session.index + 1} / {session.problems.length}</span>
+          {/*
+            The finish line moves, so the counter says so. Freezing it at
+            "/ 20" while the session quietly continued past twenty would read
+            as a broken app — and the child would have no idea what to do about
+            it. Getting them right is what brings this number down.
+          */}
+          <span className="tabular-nums">{stats.answered + 1} / {stats.total}</span>
         </div>
 
         {/*
@@ -263,10 +279,20 @@ export function Practice({ skill, progress, onProgress, onLeave, onPickSkill, se
         <p className="mt-2 h-5 text-xs text-slate-400 dark:text-slate-500">
           {problem.skill !== skill && `Review · ${SKILL_BY_ID.get(problem.skill)?.label ?? ''}`}
         </p>
+        {/*
+          Only once they are past the minimum and the session is still going.
+          Before that "12 / 20" explains itself; after it, a counter that keeps
+          moving needs a reason attached, and the reason is the actual rule.
+        */}
+        {stats.answered >= session.minimum && (
+          <p className="mt-1 text-xs font-medium text-amber-700 dark:text-amber-500">
+            {stats.goal.right} of your last {stats.goal.window} right · {stats.goal.required} needed
+          </p>
+        )}
         <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
           <div
             className="h-full rounded-full bg-emerald-500 transition-all duration-300"
-            style={{ width: `${(session.index / session.problems.length) * 100}%` }}
+            style={{ width: `${(stats.answered / Math.max(stats.total, 1)) * 100}%` }}
           />
         </div>
       </div>
