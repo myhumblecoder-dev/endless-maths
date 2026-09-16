@@ -1,7 +1,7 @@
 'use client'
 
 import { Component, type ReactNode } from 'react'
-import { STORAGE_KEY } from '@/lib/mastery/storage'
+import { resetAfterCrash, type ProfileStore } from '@/lib/mastery/profiles'
 
 /**
  * Catches anything that throws during render so a child never meets a blank
@@ -26,10 +26,21 @@ export class SafeScreen extends Component<{ children: ReactNode }, { crashed: bo
    * Saved progress is the most likely culprit for a repeatable crash, so the
    * way out clears it. Losing history is recoverable; an app that crashes every
    * time it opens is not.
+   *
+   * It must clear the journey actually in use. Clearing a key nothing writes to
+   * would leave the offending record in place and the reload would crash again
+   * — an unbreakable loop, which is the one thing this component exists to
+   * prevent.
    */
   private startAgain = () => {
     try {
-      window.localStorage.removeItem(STORAGE_KEY)
+      const store = window.localStorage as unknown as ProfileStore
+      resetAfterCrash({
+        getItem: (k) => store.getItem(k),
+        setItem: (k, v) => store.setItem(k, v),
+        removeItem: (k) => store.removeItem(k),
+        keys: () => Object.keys(window.localStorage),
+      })
     } catch {
       // Nothing useful to do; reloading is still worth a try.
     }

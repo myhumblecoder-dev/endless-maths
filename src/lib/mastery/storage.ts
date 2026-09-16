@@ -57,11 +57,3 @@ export function saveProgress(store: KeyValueStore, progress: Progress): void {
     // Losing the save is survivable; the session continues in memory.
   }
 }
-
-/** `localStorage` when there is a window, otherwise a no-op for SSR. */
-export function browserStore(): KeyValueStore {
-  if (typeof window === 'undefined') {
-    return { getItem: () => null, setItem: () => {} }
-  }
-  return window.localStorage
-}

@@ -27,7 +27,14 @@ export type ProfileState = {
 }
 
 /** A store that can also forget, which deleting a profile needs. */
-export type ProfileStore = KeyValueStore & { removeItem(key: string): void }
+export type ProfileStore = KeyValueStore & {
+  removeItem(key: string): void
+  /** Optional: lets a reset sweep everything this app owns. */
+  keys?: () => string[]
+}
+
+/** Everything this app stores lives under one prefix, which a reset can sweep. */
+const KEY_PREFIX = 'endless-maths:'
 
 const EMPTY: ProfileState = { profiles: [], activeId: null }
 
@@ -60,8 +67,11 @@ export function loadProfiles(store: KeyValueStore): ProfileState {
      * profile reopened the previous journey on reload, and the next child
      * practised into it: exactly the mixing this whole module exists to stop.
      */
-    const dangling = typeof activeId === 'string' && !valid.some((p) => p.id === activeId)
-    return { profiles: valid, activeId: dangling ? (valid[0]?.id ?? null) : (activeId ?? null) }
+    // Anything that is not a string is not an id. A number would build a
+    // nonsense storage key and a Switch button with no name on it.
+    const chosen = typeof activeId === 'string' ? activeId : null
+    const dangling = chosen !== null && !valid.some((p) => p.id === chosen)
+    return { profiles: valid, activeId: dangling ? (valid[0]?.id ?? null) : chosen }
   } catch {
     return EMPTY
   }
@@ -99,10 +109,15 @@ export function addProfile(state: ProfileState, name: string, id: string): Profi
   }
 }
 
+/** Same rules as adding: trimmed, and never a duplicate of someone else. */
 export function renameProfile(state: ProfileState, id: string, name: string): ProfileState {
+  const trimmed = name.trim()
+  if (trimmed === '') return state
+  if (state.profiles.some((p) => p.id !== id && sameName(p.name, trimmed))) return state
+
   return {
     ...state,
-    profiles: state.profiles.map((p) => (p.id === id ? { ...p, name } : p)),
+    profiles: state.profiles.map((p) => (p.id === id ? { ...p, name: trimmed } : p)),
   }
 }
 
@@ -121,7 +136,9 @@ export function removeProfile(
   const profiles = state.profiles.filter((p) => p.id !== id)
   return {
     profiles,
-    activeId: state.activeId === id ? (profiles[0]?.id ?? null) : state.activeId,
+    // Deleting whoever was using the device asks who is practising rather than
+    // silently continuing into a sibling's journey.
+    activeId: state.activeId === id ? null : state.activeId,
   }
 }
 
@@ -157,4 +174,41 @@ export function adoptLegacyRecord(
   }
 
   return addProfile(state, name, id)
+}
+
+/**
+ * Clear whatever made the app crash, and nothing more than necessary.
+ *
+ * This is what the crash screen's "Start again" calls. It removes the journey
+ * of whoever was using the device and deselects them, so the reload lands on
+ * the picker rather than straight back into the record that threw. A sibling's
+ * journey is not collateral damage.
+ *
+ * If the profile list itself cannot be read, there is nothing to be targeted
+ * about, so everything this app owns goes.
+ */
+export function resetAfterCrash(store: ProfileStore): void {
+  try {
+    const raw = store.getItem(PROFILES_KEY)
+    if (raw !== null) JSON.parse(raw) // throws if the list itself is the problem
+
+    const state = loadProfiles(store)
+    if (state.activeId) {
+      store.removeItem(progressKeyFor(state.activeId))
+      saveProfiles(store, { ...state, activeId: null })
+      return
+    }
+    // Nobody is using the device, so there is nothing to be targeted about —
+    // fall through and sweep, which also clears any pre-profiles record.
+  } catch {
+    // Fall through to the clean slate below.
+  }
+
+  try {
+    const owned = store.keys?.().filter((k) => k.startsWith(KEY_PREFIX))
+      ?? [PROFILES_KEY, STORAGE_KEY]
+    for (const key of owned) store.removeItem(key)
+  } catch {
+    // Nothing further to try; the reload is still worth attempting.
+  }
 }
