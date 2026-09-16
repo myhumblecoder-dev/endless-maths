@@ -132,7 +132,17 @@ export type Attempt = {
 /** Seeded so a session is reproducible and generation needs no network. */
 export type Rng = () => number
 
-export type Generator = (rng: Rng) => Problem
+/**
+ * How hard a topic is asked, within the topic. Only procedure skills vary;
+ * see lib/problems/difficulty.ts for which, and why the rest do not.
+ */
+export type Difficulty = 'simple' | 'medium' | 'difficult'
+
+/**
+ * Omitting the level means `medium`, so every call site that predates
+ * difficulty keeps behaving exactly as it did.
+ */
+export type Generator = (rng: Rng, level?: Difficulty) => Problem
 
 export type SkillId =
   // number sense

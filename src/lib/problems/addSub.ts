@@ -1,5 +1,6 @@
-import type { Generator, Rng, SkillId } from '@/lib/curriculum/types'
+import type { Difficulty, Generator, Rng, SkillId } from '@/lib/curriculum/types'
 import { pick, until } from './rng'
+import { band } from './difficulty'
 import { int, problem } from './build'
 
 /**
@@ -53,15 +54,66 @@ export const aAdd2DigitRegroup = addTwoDigit('a-add-2digit-regroup', true)
 export const aSub2Digit = subTwoDigit('a-sub-2digit', false)
 export const aSub2DigitRegroup = subTwoDigit('a-sub-2digit-regroup', true)
 
-export const aAdd3Digit: Generator = (rng: Rng) => {
-  const a = pick(rng, 100, 899)
-  const b = pick(rng, 100, 999 - a > 100 ? 999 - a : 100)
+/** `wanted` of -1 accepts anything, 0 demands none, and n > 0 demands at least n. */
+const matches = (actual: number, wanted: number): boolean =>
+  wanted < 0 || (wanted === 0 ? actual === 0 : actual >= wanted)
+
+/** How many column sums reach ten — which is what actually makes this hard. */
+const carries = (a: number, b: number): number => {
+  let count = 0
+  let carry = 0
+  for (let place = 1; place <= 100; place *= 10) {
+    const sum = (Math.floor(a / place) % 10) + (Math.floor(b / place) % 10) + carry
+    carry = sum >= 10 ? 1 : 0
+    count += carry
+  }
+  return count
+}
+
+/**
+ * Three-digit addition, graded by CARRYING rather than by size.
+ *
+ * Bigger numbers are not harder ones: 800 + 100 is easier than 476 + 385
+ * despite the larger operands. Simple carries nowhere, difficult carries in
+ * every column — which is the version that actually catches people out.
+ */
+export const aAdd3Digit: Generator = (rng: Rng, level: Difficulty = 'medium') => {
+  const wanted = band(level, 0, -1, 2) // -1 means "however it falls"
+  const [a, b] = until(
+    () => {
+      const x = pick(rng, 100, 899)
+      return [x, pick(rng, 100, Math.max(100, 999 - x))] as [number, number]
+    },
+    ([x, y]) => x + y <= 999 && matches(carries(x, y), wanted),
+  )
   return problem('a-add-3digit', `${a} + ${b}`, int(a + b), [a, b])
 }
 
-/** Result stays positive — negative answers are a separate skill entirely. */
-export const aSub3Digit: Generator = (rng: Rng) => {
-  const a = pick(rng, 200, 999)
-  const b = pick(rng, 100, a - 1)
+/** How many columns have to borrow. The mirror of `carries`. */
+const borrows = (a: number, b: number): number => {
+  let count = 0
+  let borrow = 0
+  for (let place = 1; place <= 100; place *= 10) {
+    const top = (Math.floor(a / place) % 10) - borrow
+    const bottom = Math.floor(b / place) % 10
+    borrow = top < bottom ? 1 : 0
+    count += borrow
+  }
+  return count
+}
+
+/**
+ * Result stays positive — negative answers are a separate skill entirely.
+ * Graded by borrowing, for the same reason addition is graded by carrying.
+ */
+export const aSub3Digit: Generator = (rng: Rng, level: Difficulty = 'medium') => {
+  const wanted = band(level, 0, -1, 2)
+  const [a, b] = until(
+    () => {
+      const x = pick(rng, 200, 999)
+      return [x, pick(rng, 100, x - 1)] as [number, number]
+    },
+    ([x, y]) => matches(borrows(x, y), wanted),
+  )
   return problem('a-sub-3digit', `${a} − ${b}`, int(a - b), [a, b])
 }
