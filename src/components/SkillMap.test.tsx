@@ -110,3 +110,56 @@ test('an unlocked topic says nothing extra', () => {
   const row = screen.getByRole('button', { name: /^Number bonds to 10/ })
   assert.doesNotMatch(row.textContent ?? '', /after|needs/i)
 })
+
+// ---- progress worth looking at --------------------------------------------
+
+/** A learner who has practised one skill, mostly getting it right. */
+const practised = (skill: string, verdicts: boolean[]): Progress => {
+  let p: Progress = { ...placed('n-bonds-10'), placementDone: true }
+  verdicts.forEach((ok, i) => {
+    p = record(p, {
+      problemId: `${skill}#${i}`, skill: skill as Progress['placed'][number],
+      given: 'x', verdict: ok ? 'correct' : 'incorrect', elapsedMs: 2000, at: i,
+    })
+  })
+  return p
+}
+
+test('a practised topic shows how it is going', () => {
+  const p = practised('n-bonds-10', [true, true, true, true, false])
+  render(<SkillMap progress={p} onPick={() => {}} onRetakePlacement={() => {}} now={0} />)
+
+  const row = screen.getByRole('button', { name: /^Number bonds to 10/ })
+  assert.match(row.textContent ?? '', /80%/, 'a binary tick is thin for an 11-year-old')
+})
+
+test('an unpractised topic shows no figures', () => {
+  render(<SkillMap progress={placed()} onPick={() => {}} onRetakePlacement={() => {}} now={0} />)
+  const row = screen.getByRole('button', { name: /^Number bonds to 10/ })
+  assert.doesNotMatch(row.textContent ?? '', /%/)
+})
+
+test('a trend is shown once there is enough to go on', () => {
+  const p = practised('n-bonds-10',
+    [false, false, false, false, false, true, true, true, true, true])
+  render(<SkillMap progress={p} onPick={() => {}} onRetakePlacement={() => {}} now={0} />)
+
+  const row = screen.getByRole('button', { name: /^Number bonds to 10/ })
+  assert.match(row.textContent ?? '', /improving/i)
+})
+
+test('the figures are factual, not praise or blame', () => {
+  const p = practised('n-bonds-10', [true, true, true, true, true, true, true, true])
+  render(<SkillMap progress={p} onPick={() => {}} onRetakePlacement={() => {}} now={0} />)
+
+  const body = document.body.textContent ?? ''
+  for (const word of ['well done', 'great', 'poor', 'bad', 'oops', 'amazing']) {
+    assert.ok(!new RegExp(word, 'i').test(body), `"${word}" is judgement, not information`)
+  }
+})
+
+test('accuracy is in the accessible name too', () => {
+  const p = practised('n-bonds-10', [true, true, true, true, false])
+  render(<SkillMap progress={p} onPick={() => {}} onRetakePlacement={() => {}} now={0} />)
+  expect(screen.getByRole('button', { name: /^Number bonds to 10.*80%/ })).toBeTruthy()
+})
