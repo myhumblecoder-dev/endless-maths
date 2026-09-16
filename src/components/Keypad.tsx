@@ -115,7 +115,7 @@ export function Keypad({ answer, onKey, onSubmit, canSubmit, disabled }: Props) 
         className="col-span-3 h-16 rounded-2xl bg-emerald-500 text-2xl font-bold text-white
                    transition active:scale-95 hover:bg-emerald-600 disabled:opacity-30"
       >
-        Check
+        Submit
       </button>
     </div>
   )

@@ -141,14 +141,14 @@ test('an incomplete entry cannot be submitted', async () => {
   render(<Harness />)
   await advanceToNumeric()
 
-  const check = screen.getByRole('button', { name: 'Check' }) as HTMLButtonElement
-  assert.equal(check.disabled, true, 'Check must be disabled with nothing entered')
+  const check = screen.getByRole('button', { name: 'Submit' }) as HTMLButtonElement
+  assert.equal(check.disabled, true, 'Submit must be disabled with nothing entered')
 
   fireEvent.keyDown(window, { key: '5' })
   assert.equal(check.disabled, false)
 
   fireEvent.keyDown(window, { key: 'Backspace' })
-  assert.equal(check.disabled, true, 'Check must be disabled again once cleared')
+  assert.equal(check.disabled, true, 'Submit must be disabled again once cleared')
 })
 
 test('the keypad is not clickable while feedback is showing', async () => {
@@ -320,7 +320,7 @@ test('Escape leaves the session', () => {
   assert.equal(leaves.length, 1, 'a learner should not need a mouse to back out')
 })
 
-test('the back link and Check are reachable as real buttons', () => {
+test('the back link and Submit are reachable as real buttons', () => {
   render(<Harness />)
   // Native buttons are focusable and Enter-activatable; anything else would
   // need explicit key handling to be usable without a mouse.

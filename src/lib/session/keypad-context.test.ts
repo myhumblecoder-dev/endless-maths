@@ -13,7 +13,7 @@ const dec = (value: number, dp: number): Answer => ({ kind: 'decimal', value, dp
 /**
  * Reported by review. A child answering 7 x 8 types "56", then presses x —
  * the obvious key for "times" on a physical keyboard. The entry became "56x",
- * Check stayed enabled, and a correct answer was graded incorrect.
+ * Submit stayed enabled, and a correct answer was graded incorrect.
  *
  * This is the failure the whole codebase is built to avoid.
  */
@@ -77,7 +77,7 @@ test('relation keys appear only when a relation is wanted', () => {
   assert.equal(isEntryKey('>', ineq('x>5')), true)
   assert.equal(isEntryKey('<', ineq('x>5')), true)
   // An expression answer with no relation must not accept one — a stray "<"
-  // would make the entry unparseable and silently disable Check.
+  // would make the entry unparseable and silently disable Submit.
   assert.equal(isEntryKey('>', expr('5x+3')), false)
   assert.equal(isEntryKey('>', int(5)), false)
 })

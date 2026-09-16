@@ -53,7 +53,7 @@ test('an expression answer gets the unknown and the operators', () => {
   const keys = (show({ kind: 'expression', canonical: '5x+3' }), keyNames())
   for (const present of ['x', '+', '−']) assert.ok(keys.includes(present), `${present} is missing`)
   // No relations: a stray one would make the entry unparseable and silently
-  // disable Check, with nothing on screen to explain why.
+  // disable Submit, with nothing on screen to explain why.
   for (const absent of ['<', '>']) assert.ok(!keys.includes(absent), `${absent} does not belong here`)
 })
 

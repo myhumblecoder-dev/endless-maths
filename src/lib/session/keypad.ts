@@ -30,7 +30,7 @@ const separatorFor = (answer: Answer) => (answer.kind === 'parts' ? answer.separ
 /**
  * Is a relation part of this answer? Only inequalities want `<` and `>`; on any
  * other expression a stray one makes the entry unparseable and silently
- * disables Check, with nothing on screen to explain why.
+ * disables Submit, with nothing on screen to explain why.
  */
 const wantsRelation = (answer: Answer) =>
   answer.kind === 'expression' && /[<>]/.test(answer.canonical)
