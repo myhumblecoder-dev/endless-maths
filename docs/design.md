@@ -65,6 +65,9 @@ composes perfectly with a deterministic engine that needs no server anyway.
 The first feature that breaks this is a parent dashboard with cross-device sync.
 That is the moment the compliance work starts. Defer it deliberately.
 
+**That moment has now been chosen deliberately — see "What may leave the
+device" below.**
+
 ### 4. Endless supply, bounded sessions
 
 The product is called Endless Maths, but a seven-year-old needs a finish line.
@@ -183,6 +186,25 @@ Two things this must never become:
 
 The rule holds everywhere it could apply: fractions, and simplified ratios
 (`2 : 3`, not `4 : 6`). It lives in one place so it cannot drift.
+
+## What may leave the device
+
+Sending a journey to a model is the moment client-side-only stops being true.
+It was decided once, in the open, rather than drifting into it.
+
+**The full journey may leave. Names may not.**
+
+- Every attempt, **including the wrong answers** — `1/2 + 1/3 = 2/5` is a
+  diagnosis, "got it wrong" is not, and an analysis without the mistakes is
+  worth very little.
+- Under a **profile id, never a name.** "Eddie" identifies a child; `p_3f9a`
+  does not. Names are stored locally so a child recognises their own profile,
+  and are stripped from anything that crosses the boundary.
+- **Nothing crosses without an adult doing something explicit.** Not on a
+  timer, not on a session ending.
+
+The name rule is enforced in one place and tested, because a rule that depends
+on everyone remembering it is not a rule.
 
 ## Deployment shape
 
