@@ -28,6 +28,10 @@ const normalise = (p: Progress): Progress => ({
   ...p,
   placed: Array.isArray(p.placed) ? p.placed : [],
   placementDone: p.placementDone === true,
+  // Spread rather than assigned, so a record without a chosen length stays
+  // without one — an explicit `undefined` key is not the same object.
+  // The value itself is validated on read; see session/length.ts.
+  ...(p.sessionLength === undefined ? {} : { sessionLength: p.sessionLength }),
 })
 
 /**

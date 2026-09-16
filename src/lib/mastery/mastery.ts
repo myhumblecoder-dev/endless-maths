@@ -45,6 +45,8 @@ export type Progress = {
    * nothing, and must not be handed the quiz again every time they open the app.
    */
   placementDone: boolean
+  /** Chosen session length. Absent means the default; see session/length.ts. */
+  sessionLength?: number
 }
 
 export const emptyProgress = (): Progress => ({
@@ -102,10 +104,59 @@ export function skillCorrectRate(progress: Progress, skill: SkillId): number {
   return s.recent.filter(Boolean).length / s.recent.length
 }
 
-/** Accuracy over a trailing window. Deliberately says nothing about speed. */
+/**
+ * Accuracy over a trailing window. Deliberately says nothing about speed.
+ *
+ * Placement is a claim; practice is evidence. Until there is enough practice
+ * the claim stands, and after that the evidence wins — otherwise a skill
+ * someone placed out of stays ticked "done" while they get 30% of it wrong.
+ */
 export function isSkillMastered(progress: Progress, skill: SkillId): boolean {
-  if (progress.placed.includes(skill)) return true
   const s = progress.skills[skill]
-  if (!s || s.attempts < MIN_PROCEDURE_ATTEMPTS) return false
+  const enoughEvidence = s !== undefined && s.attempts >= MIN_PROCEDURE_ATTEMPTS
+
+  if (!enoughEvidence) return progress.placed.includes(skill)
   return skillCorrectRate(progress, skill) >= PROCEDURE_MASTERY_RATE
+}
+
+/** Enough answers for a trend to mean anything rather than be noise. */
+const TREND_MINIMUM = 6
+
+/** How much the two halves must differ before it counts as movement. */
+const TREND_THRESHOLD = 0.2
+
+export type SkillProgress = {
+  attempts: number
+  /** Over the trailing window, not all time. */
+  accuracy: number
+  trend: 'up' | 'down' | 'steady' | 'unknown'
+}
+
+/**
+ * What to show a learner about a skill.
+ *
+ * A lifetime average hides exactly what they want to know: someone who was at
+ * 40% and is now at 90% deserves to see that, not a flat 65%. The trend
+ * compares the two halves of the trailing window, and refuses to claim one at
+ * all from too few answers.
+ */
+export function skillProgress(progress: Progress, skill: SkillId): SkillProgress | undefined {
+  const state = progress.skills[skill]
+  if (!state || state.attempts === 0) return undefined
+
+  const { recent } = state
+  const accuracy = recent.length === 0 ? 0 : recent.filter(Boolean).length / recent.length
+
+  if (recent.length < TREND_MINIMUM) {
+    return { attempts: state.attempts, accuracy, trend: 'unknown' }
+  }
+
+  const half = Math.floor(recent.length / 2)
+  const rate = (slice: boolean[]) => slice.filter(Boolean).length / slice.length
+  const change = rate(recent.slice(half)) - rate(recent.slice(0, half))
+
+  const trend =
+    change > TREND_THRESHOLD ? 'up' : change < -TREND_THRESHOLD ? 'down' : 'steady'
+
+  return { attempts: state.attempts, accuracy, trend }
 }

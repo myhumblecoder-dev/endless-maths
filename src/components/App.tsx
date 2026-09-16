@@ -58,6 +58,7 @@ export function App() {
       progress={progress}
       onPick={setSkill}
       onRetakePlacement={() => persist({ ...progress, placed: [], placementDone: false })}
+      onSessionLength={(sessionLength) => persist({ ...progress, sessionLength })}
       now={now}
     />
   )

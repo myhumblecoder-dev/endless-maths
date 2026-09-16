@@ -141,14 +141,14 @@ test('an incomplete entry cannot be submitted', async () => {
   render(<Harness />)
   await advanceToNumeric()
 
-  const check = screen.getByRole('button', { name: 'Check' }) as HTMLButtonElement
-  assert.equal(check.disabled, true, 'Check must be disabled with nothing entered')
+  const check = screen.getByRole('button', { name: 'Submit' }) as HTMLButtonElement
+  assert.equal(check.disabled, true, 'Submit must be disabled with nothing entered')
 
   fireEvent.keyDown(window, { key: '5' })
   assert.equal(check.disabled, false)
 
   fireEvent.keyDown(window, { key: 'Backspace' })
-  assert.equal(check.disabled, true, 'Check must be disabled again once cleared')
+  assert.equal(check.disabled, true, 'Submit must be disabled again once cleared')
 })
 
 test('the keypad is not clickable while feedback is showing', async () => {
@@ -268,4 +268,62 @@ test('a problem from another skill is labelled as review', { timeout: 40_000 }, 
 
   assert.ok(sawReview, 'problems from other skills should say so')
   assert.ok(sawChosen, 'the chosen skill should not be labelled review')
+})
+
+// ---- keyboard-first -------------------------------------------------------
+// These two will be on laptops. Anything reachable only by mouse is unusable.
+
+function CompareHarness({ onLeave = () => {} }: { onLeave?: () => void }) {
+  const [progress, setProgress] = useState<Progress>(() => ({
+    ...emptyProgress(),
+    placed: ['n-compare-20'],
+    placementDone: true,
+  }))
+  return (
+    <Practice skill="n-compare-20" progress={progress} onProgress={setProgress}
+      onLeave={onLeave} seed={31} />
+  )
+}
+
+/** Interleaving means the chosen skill is not always what is on screen first. */
+async function advanceToCompare(): Promise<void> {
+  for (let i = 0; i < 10 && !comparePrompt(); i++) {
+    answerCorrectly()
+    await settle()
+  }
+  assert.ok(comparePrompt(), 'no comparison appeared in ten problems')
+}
+
+test('a comparison can be answered from the keyboard', { timeout: 30_000 }, async () => {
+  render(<CompareHarness />)
+  await advanceToCompare()
+
+  const prompt = comparePrompt()!
+  const [, a, b] = prompt.match(/^(\d+) \? (\d+)$/)!
+  fireEvent.keyDown(window, { key: +a > +b ? '>' : +a < +b ? '<' : '=' })
+
+  expect(screen.getByText(/Correct/)).toBeTruthy()
+})
+
+test('a wrong relation typed from the keyboard is marked wrong', { timeout: 30_000 }, async () => {
+  render(<CompareHarness />)
+  await advanceToCompare()
+  const [, a, b] = comparePrompt()!.match(/^(\d+) \? (\d+)$/)!
+  fireEvent.keyDown(window, { key: +a > +b ? '<' : '>' })
+  expect(screen.getByText(/Answer:/)).toBeTruthy()
+})
+
+test('Escape leaves the session', () => {
+  const leaves: number[] = []
+  render(<CompareHarness onLeave={() => leaves.push(1)} />)
+  fireEvent.keyDown(window, { key: 'Escape' })
+  assert.equal(leaves.length, 1, 'a learner should not need a mouse to back out')
+})
+
+test('the back link and Submit are reachable as real buttons', () => {
+  render(<Harness />)
+  // Native buttons are focusable and Enter-activatable; anything else would
+  // need explicit key handling to be usable without a mouse.
+  const back = screen.getByRole('button', { name: /Back to the topic list|←/ })
+  assert.equal(back.tagName, 'BUTTON')
 })

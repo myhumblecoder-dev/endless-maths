@@ -10,10 +10,14 @@ import { GENERATORS, generate, type ImplementedSkill } from '@/lib/problems'
 import { check } from '@/lib/problems/check'
 import { record, type Progress } from '@/lib/mastery/mastery'
 import { nextSkill, unlockedSkills, weakestDueFirst } from './scheduler'
+import { DEFAULT_SESSION_LENGTH, sessionLengthOf } from './length'
 import { isSkillMastered } from '@/lib/mastery/mastery'
 
-/** Twenty problems, or roughly five minutes. Long enough to matter, short enough to finish. */
-export const SESSION_LENGTH = 20
+/**
+ * The default run. Long enough to matter, short enough to finish — but now a
+ * default rather than a rule: see session/length.ts.
+ */
+export const SESSION_LENGTH = DEFAULT_SESSION_LENGTH
 
 export type Session = {
   problems: Problem[]
@@ -136,7 +140,9 @@ function buildPlan(
 }
 
 export function startSession(progress: Progress, rng: Rng, options: SessionOptions = {}): Session {
-  const { length = SESSION_LENGTH, skill: focus, now = Date.now() } = options
+  // An explicit length wins; otherwise the learner's preference; otherwise the
+  // default.
+  const { length = sessionLengthOf(progress), skill: focus, now = Date.now() } = options
   const plan = focus ? buildPlan(progress, focus, length, now, rng) : null
   const available = unlockedSkills(progress)
   const problems: Problem[] = []

@@ -304,3 +304,26 @@ test('an unsimplified answer does not finish the problem', () => {
   assert.equal(completesProblem('incorrect'), true)
   assert.equal(completesProblem('equivalent-unsimplified'), false)
 })
+
+test('a session honours the chosen length', () => {
+  const short: Progress = { ...emptyProgress(), sessionLength: 10 }
+  assert.equal(startSession(short, seeded(2), { skill: 'n-bonds-10' }).problems.length, 10)
+
+  const long: Progress = { ...emptyProgress(), sessionLength: 40 }
+  assert.equal(startSession(long, seeded(2), { skill: 'n-bonds-10' }).problems.length, 40)
+})
+
+test('an explicit length still wins over the preference', () => {
+  const short: Progress = { ...emptyProgress(), sessionLength: 10 }
+  assert.equal(startSession(short, seeded(2), { skill: 'n-bonds-10', length: 5 }).problems.length, 5)
+})
+
+test('the mix still holds at other lengths', () => {
+  const p: Progress = {
+    ...emptyProgress(), sessionLength: 40, placementDone: true,
+    placed: ['n-bonds-10', 'a-add-within-10', 'a-sub-within-10', 'a-add-within-20'],
+  }
+  const s = startSession(p, seeded(6), { skill: 'a-sub-within-20' })
+  const chosen = s.problems.filter((q) => q.skill === 'a-sub-within-20').length
+  assert.ok(chosen >= 16 && chosen <= 28, `chosen skill took ${chosen} of 40`)
+})

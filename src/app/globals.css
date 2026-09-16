@@ -24,3 +24,17 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/*
+ * A visible focus ring on anything reachable by keyboard.
+ *
+ * These two will be on laptops, and Tailwind's reset removes the browser
+ * default — leaving a keyboard user with no idea what they are about to
+ * activate. `:focus-visible` rather than `:focus`, so a tap on a phone does
+ * not leave a ring behind.
+ */
+:focus-visible {
+  outline: 3px solid #0ea5e9;
+  outline-offset: 3px;
+  border-radius: 0.75rem;
+}

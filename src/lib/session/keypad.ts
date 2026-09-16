@@ -30,7 +30,7 @@ const separatorFor = (answer: Answer) => (answer.kind === 'parts' ? answer.separ
 /**
  * Is a relation part of this answer? Only inequalities want `<` and `>`; on any
  * other expression a stray one makes the entry unparseable and silently
- * disables Check, with nothing on screen to explain why.
+ * disables Submit, with nothing on screen to explain why.
  */
 const wantsRelation = (answer: Answer) =>
   answer.kind === 'expression' && /[<>]/.test(answer.canonical)
@@ -143,4 +143,19 @@ export function canSubmit(entry: Entry, answer: Answer): boolean {
     default:
       return /^-?\d*\.?\d*$/.test(entry) && /\d$/.test(entry)
   }
+}
+
+/**
+ * The option a key selects, for answers that are a choice rather than typed.
+ *
+ * A symbol option is picked by pressing it; a word option by its first letter.
+ * Without this, a comparison question could only be answered with a mouse —
+ * which is most of the way to unusable on a laptop.
+ */
+export function choiceForKey(key: string, answer: Answer): string | undefined {
+  if (answer.kind !== 'choice') return undefined
+  const pressed = key.toLowerCase()
+  return answer.options.find(
+    (option) => option.toLowerCase() === pressed || option[0].toLowerCase() === pressed,
+  )
 }

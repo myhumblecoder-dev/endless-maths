@@ -1,6 +1,6 @@
 import { test } from 'vitest'
 import assert from 'node:assert/strict'
-import { press, canSubmit, isEntryKey } from './keypad'
+import { press, canSubmit, isEntryKey, choiceForKey } from './keypad'
 import { check } from '@/lib/problems/check'
 import type { Answer } from '@/lib/curriculum/types'
 
@@ -13,7 +13,7 @@ const dec = (value: number, dp: number): Answer => ({ kind: 'decimal', value, dp
 /**
  * Reported by review. A child answering 7 x 8 types "56", then presses x —
  * the obvious key for "times" on a physical keyboard. The entry became "56x",
- * Check stayed enabled, and a correct answer was graded incorrect.
+ * Submit stayed enabled, and a correct answer was graded incorrect.
  *
  * This is the failure the whole codebase is built to avoid.
  */
@@ -77,7 +77,7 @@ test('relation keys appear only when a relation is wanted', () => {
   assert.equal(isEntryKey('>', ineq('x>5')), true)
   assert.equal(isEntryKey('<', ineq('x>5')), true)
   // An expression answer with no relation must not accept one — a stray "<"
-  // would make the entry unparseable and silently disable Check.
+  // would make the entry unparseable and silently disable Submit.
   assert.equal(isEntryKey('>', expr('5x+3')), false)
   assert.equal(isEntryKey('>', int(5)), false)
 })
@@ -102,4 +102,42 @@ test('a half-written inequality cannot be submitted', () => {
   const answer = ineq('x>5')
   assert.equal(canSubmit('x>', answer), false)
   assert.equal(canSubmit('x', answer), false, 'a bare x is not a range')
+})
+
+// ---- answering a choice from the keyboard ---------------------------------
+// Choice answers could only be clicked, so a keyboard user could not answer a
+// comparison question at all.
+
+const compare: Answer = { kind: 'choice', value: '<', options: ['<', '=', '>'] }
+const yesNo: Answer = { kind: 'choice', value: 'yes', options: ['yes', 'no'] }
+
+test('a relation key picks the matching option', () => {
+  assert.equal(choiceForKey('<', compare), '<')
+  assert.equal(choiceForKey('=', compare), '=')
+  assert.equal(choiceForKey('>', compare), '>')
+})
+
+test('a word option is picked by its first letter', () => {
+  assert.equal(choiceForKey('y', yesNo), 'yes')
+  assert.equal(choiceForKey('n', yesNo), 'no')
+  assert.equal(choiceForKey('Y', yesNo), 'yes', 'case should not matter')
+})
+
+test('a key matching nothing picks nothing', () => {
+  assert.equal(choiceForKey('q', compare), undefined)
+  assert.equal(choiceForKey('Enter', yesNo), undefined)
+  assert.equal(choiceForKey('5', compare), undefined)
+})
+
+test('choices are only offered for choice answers', () => {
+  assert.equal(choiceForKey('<', int(5)), undefined)
+  assert.equal(choiceForKey('y', expr('x')), undefined)
+})
+
+/** Two options starting with the same letter would make the shortcut a lie. */
+test('every choice skill has options distinguishable by first letter', () => {
+  for (const options of [['<', '=', '>'], ['yes', 'no']]) {
+    const initials = options.map((o) => o[0].toLowerCase())
+    assert.equal(new Set(initials).size, initials.length, options.join('/'))
+  }
 })

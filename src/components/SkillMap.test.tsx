@@ -17,7 +17,7 @@ test('unlocked skills can be chosen', () => {
   const onPick = vi.fn()
   render(<SkillMap progress={placed()} onPick={onPick} onRetakePlacement={() => {}} now={0} />)
 
-  fireEvent.click(screen.getByRole('button', { name: /Number bonds to 10/ }))
+  fireEvent.click(screen.getByRole('button', { name: /^Number bonds to 10/ }))
   assert.deepEqual(onPick.mock.calls, [['n-bonds-10']])
 })
 
@@ -25,7 +25,7 @@ test('locked skills are visible but cannot be chosen', () => {
   const onPick = vi.fn()
   render(<SkillMap progress={placed()} onPick={onPick} onRetakePlacement={() => {}} now={0} />)
 
-  const locked = screen.getByRole('button', { name: /Two-step equations \(locked\)/ }) as HTMLButtonElement
+  const locked = screen.getByRole('button', { name: /^Two-step equations \(locked/ }) as HTMLButtonElement
   assert.equal(locked.disabled, true, 'locks are hard — seeing what is coming must not mean tapping into it')
   fireEvent.click(locked)
   assert.equal(onPick.mock.calls.length, 0)
@@ -33,7 +33,7 @@ test('locked skills are visible but cannot be chosen', () => {
 
 test('mastered skills are marked done', () => {
   render(<SkillMap progress={placed('n-bonds-10')} onPick={() => {}} onRetakePlacement={() => {}} now={0} />)
-  const bonds = screen.getByRole('button', { name: /Number bonds to 10/ })
+  const bonds = screen.getByRole('button', { name: /^Number bonds to 10/ })
   assert.match(bonds.textContent ?? '', /done/)
 })
 
@@ -75,6 +75,112 @@ test('a skill with facts due says so', () => {
     given: '30', verdict: 'incorrect', elapsedMs: 4000, at: 0,
   })
   render(<SkillMap progress={p} onPick={() => {}} onRetakePlacement={() => {}} now={60 * 60 * 1000} />)
-  const row = screen.getByRole('button', { name: /The 2, 5 and 10 times tables/ })
+  const row = screen.getByRole('button', { name: /^The 2, 5 and 10 times tables/ })
   assert.match(row.textContent ?? '', /1 to review/i, 'due work should be visible before starting')
+})
+
+// ---- saying why a topic is locked -----------------------------------------
+
+test('a locked topic says what would unlock it', () => {
+  render(<SkillMap progress={placed()} onPick={() => {}} onRetakePlacement={() => {}} now={0} />)
+
+  const row = screen.getByRole('button', { name: /^Adding to 10/ })
+  assert.match(row.textContent ?? '', /Number bonds to 10/,
+    'a lock with no reason reads as the app being arbitrary')
+})
+
+test('the reason is part of the accessible name, not just colour', () => {
+  render(<SkillMap progress={placed()} onPick={() => {}} onRetakePlacement={() => {}} now={0} />)
+  // Screen readers and greyed text are not the same channel.
+  expect(screen.getByRole('button', { name: /^Adding to 10.*Number bonds to 10/ })).toBeTruthy()
+})
+
+test('only the next step is named, not the whole chain', () => {
+  render(<SkillMap progress={placed()} onPick={() => {}} onRetakePlacement={() => {}} now={0} />)
+
+  const row = screen.getByRole('button', { name: /^Two-step equations/ })
+  assert.match(row.textContent ?? '', /One-step equations|negatives/i)
+  assert.doesNotMatch(row.textContent ?? '', /Number bonds/,
+    'the far end of the chain is true but useless')
+})
+
+test('an unlocked topic says nothing extra', () => {
+  render(<SkillMap progress={placed()} onPick={() => {}} onRetakePlacement={() => {}} now={0} />)
+
+  const row = screen.getByRole('button', { name: /^Number bonds to 10/ })
+  assert.doesNotMatch(row.textContent ?? '', /after|needs/i)
+})
+
+// ---- progress worth looking at --------------------------------------------
+
+/** A learner who has practised one skill, mostly getting it right. */
+const practised = (skill: string, verdicts: boolean[]): Progress => {
+  let p: Progress = { ...placed('n-bonds-10'), placementDone: true }
+  verdicts.forEach((ok, i) => {
+    p = record(p, {
+      problemId: `${skill}#${i}`, skill: skill as Progress['placed'][number],
+      given: 'x', verdict: ok ? 'correct' : 'incorrect', elapsedMs: 2000, at: i,
+    })
+  })
+  return p
+}
+
+test('a practised topic shows how it is going', () => {
+  const p = practised('n-bonds-10', [true, true, true, true, false])
+  render(<SkillMap progress={p} onPick={() => {}} onRetakePlacement={() => {}} now={0} />)
+
+  const row = screen.getByRole('button', { name: /^Number bonds to 10/ })
+  assert.match(row.textContent ?? '', /80%/, 'a binary tick is thin for an 11-year-old')
+})
+
+test('an unpractised topic shows no figures', () => {
+  render(<SkillMap progress={placed()} onPick={() => {}} onRetakePlacement={() => {}} now={0} />)
+  const row = screen.getByRole('button', { name: /^Number bonds to 10/ })
+  assert.doesNotMatch(row.textContent ?? '', /%/)
+})
+
+test('a trend is shown once there is enough to go on', () => {
+  const p = practised('n-bonds-10',
+    [false, false, false, false, false, true, true, true, true, true])
+  render(<SkillMap progress={p} onPick={() => {}} onRetakePlacement={() => {}} now={0} />)
+
+  const row = screen.getByRole('button', { name: /^Number bonds to 10/ })
+  assert.match(row.textContent ?? '', /improving/i)
+})
+
+test('the figures are factual, not praise or blame', () => {
+  const p = practised('n-bonds-10', [true, true, true, true, true, true, true, true])
+  render(<SkillMap progress={p} onPick={() => {}} onRetakePlacement={() => {}} now={0} />)
+
+  const body = document.body.textContent ?? ''
+  for (const word of ['well done', 'great', 'poor', 'bad', 'oops', 'amazing']) {
+    assert.ok(!new RegExp(word, 'i').test(body), `"${word}" is judgement, not information`)
+  }
+})
+
+test('accuracy is in the accessible name too', () => {
+  const p = practised('n-bonds-10', [true, true, true, true, false])
+  render(<SkillMap progress={p} onPick={() => {}} onRetakePlacement={() => {}} now={0} />)
+  expect(screen.getByRole('button', { name: /^Number bonds to 10.*80%/ })).toBeTruthy()
+})
+
+// ---- session length -------------------------------------------------------
+
+test('the session length can be chosen and is highlighted', () => {
+  const onLength = vi.fn()
+  render(<SkillMap progress={placed()} onPick={() => {}} onRetakePlacement={() => {}}
+    onSessionLength={onLength} now={0} />)
+
+  const forty = screen.getByRole('button', { name: /40 questions/ })
+  fireEvent.click(forty)
+  assert.deepEqual(onLength.mock.calls, [[40]])
+})
+
+test('the current length is marked as selected', () => {
+  render(<SkillMap progress={{ ...placed(), sessionLength: 10 }} onPick={() => {}}
+    onRetakePlacement={() => {}} onSessionLength={() => {}} now={0} />)
+
+  const ten = screen.getByRole('button', { name: /10 questions/ })
+  assert.equal(ten.getAttribute('aria-pressed'), 'true')
+  assert.equal(screen.getByRole('button', { name: /20 questions/ }).getAttribute('aria-pressed'), 'false')
 })
