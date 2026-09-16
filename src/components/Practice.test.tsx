@@ -1,9 +1,10 @@
 // @vitest-environment jsdom
-import { test, afterEach, expect } from 'vitest'
+import { test, afterEach, expect, vi } from 'vitest'
 import assert from 'node:assert/strict'
 import { useState } from 'react'
 import { render, screen, fireEvent, cleanup, act } from '@testing-library/react'
 import { Practice } from './Practice'
+import { SESSION_CAP } from '@/lib/session/goal'
 import { emptyProgress, record, type Progress } from '@/lib/mastery/mastery'
 import type { ImplementedSkill } from '@/lib/problems'
 
@@ -219,30 +220,50 @@ function StruggleHarness({ onPick = () => {} }: { onPick?: (s: ImplementedSkill)
   )
 }
 
-test('the summary offers the gap underneath a skill being failed', { timeout: 60_000 }, async () => {
-  render(<StruggleHarness />)
-
-  // Play the session out, getting everything wrong.
-  for (let i = 0; i < 20; i++) {
-    type('0')
-    fireEvent.keyDown(window, { key: 'Enter' })
-    await act(async () => { await new Promise((r) => setTimeout(r, 1600)) })
+/**
+ * Play a whole session out, getting the topic in hand wrong every time.
+ *
+ * Two things this has to cope with. A session no longer has a fixed length —
+ * a run of wrong answers goes all the way to the cap — so waiting out the
+ * feedback for real would cost the cap times 1.5 seconds. And interleaved
+ * review brings in comparison questions, which are TAPPED rather than typed:
+ * a keypad-only loop jams on the first one, because its keys do not dismiss
+ * the feedback and the buttons underneath are disabled while it shows.
+ */
+async function failEverything() {
+  vi.useFakeTimers()
+  try {
+    for (let i = 0; i < SESSION_CAP; i++) {
+      if (screen.queryByRole('button', { name: /^Again$/ })) break // already finished
+      if (screen.queryByRole('button', { name: 'Submit' })) {
+        fireEvent.keyDown(window, { key: '0' })
+        fireEvent.keyDown(window, { key: 'Enter' })
+      } else {
+        fireEvent.click(screen.getAllByRole('button')[1]) // a choice: the first option
+      }
+      await act(async () => { await vi.advanceTimersByTimeAsync(FEEDBACK_MS) })
+    }
+  } finally {
+    vi.useRealTimers()
   }
+}
+
+/** Longer than the wrong-answer feedback, which is the slower of the two. */
+const FEEDBACK_MS = 1600
+
+test('the summary offers the gap underneath a skill being failed', { timeout: 30_000 }, async () => {
+  render(<StruggleHarness />)
+  await failEverything()
 
   // "Adding and subtracting negatives" is two levels below two-step equations.
   assert.match(document.body.textContent ?? '', /negatives/i,
     'a learner failing this needs the gap beneath it, not more of the same')
 })
 
-test('the suggestion can be declined', { timeout: 60_000 }, async () => {
+test('the suggestion can be declined', { timeout: 30_000 }, async () => {
   const picked: string[] = []
   render(<StruggleHarness onPick={(s) => picked.push(s)} />)
-
-  for (let i = 0; i < 20; i++) {
-    type('0')
-    fireEvent.keyDown(window, { key: 'Enter' })
-    await act(async () => { await new Promise((r) => setTimeout(r, 1600)) })
-  }
+  await failEverything()
 
   assert.equal(picked.length, 0, 'nothing should be forced on them')
   expect(screen.getByRole('button', { name: /^Again$/ })).toBeTruthy()
