@@ -9,8 +9,8 @@ afterEach(cleanup)
 
 const two: ProfileState = {
   profiles: [
-    { id: 'p1', name: 'Eddie', createdAt: 0 },
-    { id: 'p2', name: 'Ethan', createdAt: 0 },
+    { id: 'p1', name: 'Eddie' },
+    { id: 'p2', name: 'Ethan' },
   ],
   activeId: null,
 }
@@ -76,4 +76,22 @@ test('a removal can be backed out of', () => {
   fireEvent.click(screen.getByRole('button', { name: /Cancel/i }))
   assert.equal(onRemove.mock.calls.length, 0)
   expect(screen.getByRole('button', { name: 'Eddie' })).toBeTruthy()
+})
+
+/** Silently ignoring the tap would look like the app was broken. */
+test('a duplicate name is refused with a reason', () => {
+  const { onAdd } = show(two)
+  fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Eddie' } })
+  fireEvent.click(screen.getByRole('button', { name: /^Add$/i }))
+
+  assert.equal(onAdd.mock.calls.length, 0)
+  assert.match(document.body.textContent ?? '', /already/i, 'say why nothing happened')
+})
+
+test('the reason clears once the name changes', () => {
+  show(two)
+  fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Eddie' } })
+  fireEvent.click(screen.getByRole('button', { name: /^Add$/i }))
+  fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Edward' } })
+  assert.doesNotMatch(document.body.textContent ?? '', /already/i)
 })

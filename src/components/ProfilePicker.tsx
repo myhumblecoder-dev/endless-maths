@@ -23,10 +23,19 @@ export function ProfilePicker({
 }) {
   const [name, setName] = useState('')
   const [confirming, setConfirming] = useState<string | null>(null)
+  const [refused, setRefused] = useState(false)
 
   const add = () => {
     const trimmed = name.trim()
     if (trimmed === '') return
+
+    // `addProfile` refuses a duplicate name, and a tap that silently does
+    // nothing looks like the app is broken. Say why instead.
+    const taken = state.profiles.some(
+      (p) => p.name.trim().toLowerCase() === trimmed.toLowerCase(),
+    )
+    if (taken) return setRefused(true)
+
     onAdd(trimmed)
     setName('')
   }
@@ -96,12 +105,17 @@ export function ProfilePicker({
             <input
               id="new-profile"
               value={name}
-              onChange={(e) => setName(e.target.value)}
+              onChange={(e) => { setName(e.target.value); setRefused(false) }}
               onKeyDown={(e) => { if (e.key === 'Enter') add() }}
               placeholder="Their name"
               className="h-14 w-full rounded-2xl bg-slate-100 px-5 text-lg text-slate-900
                          placeholder:text-slate-400 dark:bg-slate-800 dark:text-slate-50"
             />
+            {refused && (
+              <p className="text-sm text-amber-700 dark:text-amber-400">
+                Someone here is already called that. Try another name.
+              </p>
+            )}
             <button
               type="button"
               onClick={add}

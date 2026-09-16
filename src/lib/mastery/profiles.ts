@@ -19,7 +19,6 @@ export type Profile = {
   id: string
   /** Local only. Stripped from anything that leaves the device. */
   name: string
-  createdAt: number
 }
 
 export type ProfileState = {
@@ -53,13 +52,16 @@ export function loadProfiles(store: KeyValueStore): ProfileState {
     const { profiles, activeId } = parsed as Partial<ProfileState>
     const valid = Array.isArray(profiles) ? profiles.filter(isProfile) : []
 
-    // An id pointing at a profile that no longer exists would leave the app
-    // with an active profile it cannot load.
-    const active = valid.some((p) => p.id === activeId)
-      ? (activeId as string)
-      : (valid[0]?.id ?? null)
-
-    return { profiles: valid, activeId: active }
+    /**
+     * Repair a DANGLING id only — one naming a profile that has been deleted.
+     *
+     * A deliberate `null` means somebody tapped Switch and the next child has
+     * not chosen yet. Treating that as dangling and "repairing" it to the first
+     * profile reopened the previous journey on reload, and the next child
+     * practised into it: exactly the mixing this whole module exists to stop.
+     */
+    const dangling = typeof activeId === 'string' && !valid.some((p) => p.id === activeId)
+    return { profiles: valid, activeId: dangling ? (valid[0]?.id ?? null) : (activeId ?? null) }
   } catch {
     return EMPTY
   }
@@ -74,9 +76,24 @@ export function saveProfiles(store: KeyValueStore, state: ProfileState): void {
   }
 }
 
+/** Names match on trimmed case-insensitive text: "  eddie " is Eddie. */
+const sameName = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase()
+
 export function addProfile(state: ProfileState, name: string, id: string): ProfileState {
+  const trimmed = name.trim()
+
+  /**
+   * Two profiles called "Eddie" render as two identical buttons, which defeats
+   * the point of showing names at all. A duplicate id is worse: they would
+   * share a progress key, and deleting one would wipe the other's journey.
+   */
+  const clashes =
+    state.profiles.some((p) => p.id === id) ||
+    state.profiles.some((p) => sameName(p.name, trimmed))
+  if (clashes) return state
+
   return {
-    profiles: [...state.profiles, { id, name, createdAt: 0 }],
+    profiles: [...state.profiles, { id, name: trimmed }],
     // A newly added profile is the one about to be used.
     activeId: id,
   }
@@ -123,14 +140,20 @@ export function adoptLegacyRecord(
 ): ProfileState {
   if (state.profiles.length > 0) return state
 
-  const legacy = store.getItem(STORAGE_KEY)
-  if (legacy !== null) {
-    store.setItem(progressKeyFor(id), legacy)
-    try {
+  /**
+   * Never throws, like everything else that touches storage. On a device with
+   * no quota left — Safari private mode refuses every write — losing the
+   * migration is survivable, while an exception escaping into the React tree
+   * is a blank app.
+   */
+  try {
+    const legacy = store.getItem(STORAGE_KEY)
+    if (legacy !== null) {
+      store.setItem(progressKeyFor(id), legacy)
       store.removeItem(STORAGE_KEY)
-    } catch {
-      // Leaving it behind is untidy but harmless; it is no longer read.
     }
+  } catch {
+    // The profile is still created; only the old journey is left behind.
   }
 
   return addProfile(state, name, id)

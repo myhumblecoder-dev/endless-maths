@@ -203,8 +203,10 @@ It was decided once, in the open, rather than drifting into it.
 - **Nothing crosses without an adult doing something explicit.** Not on a
   timer, not on a session ending.
 
-The name rule is enforced in one place and tested, because a rule that depends
-on everyone remembering it is not a rule.
+The name rule **will be enforced in one place and tested when the boundary is
+built** — nothing sends anything off-device yet, so there is currently nothing
+to enforce. Recording it as already done would be the kind of claim a future
+reader trusts instead of checking.
 
 ## Deployment shape
 
