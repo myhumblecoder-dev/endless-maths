@@ -137,3 +137,61 @@ test('no answers yet is a well-formed state rather than a divide by zero', () =>
   assert.equal(g.remaining, 20)
   assert.ok(Number.isFinite(g.required))
 })
+
+// ---- findings from code review ---------------------------------------------
+
+/**
+ * `allowed` was hard-coded to the twenty-answer window while `required` scaled
+ * with the window actually in force. On a ten-question session two wrong
+ * answers made the tolerated count equal the mistake count, so "how many more"
+ * collapsed to zero while the session was still running — the counter read
+ * `11 / 10`, then `12 / 11`, with the progress bar pinned at 100%. Exactly the
+ * broken-app reading the moving counter exists to avoid.
+ */
+test('a session that is not finished never says there is nothing left', () => {
+  for (const minimum of [10, 20, 40]) {
+    for (let n = minimum; n <= 45; n++) {
+      for (const wrong of [[1, 2], [0, 4, 9], [n - 1, n - 2, n - 3]]) {
+        const g = goalOf(run(n, wrong), minimum)
+        if (g.over) continue
+        assert.ok(g.remaining > 0,
+          `minimum ${minimum}, ${n} answered, wrong at ${wrong}: still running but nothing left to do`)
+      }
+    }
+  }
+})
+
+test('the projected finish is never behind where they already are', () => {
+  for (const minimum of [10, 20, 40]) {
+    for (let n = 1; n <= 45; n++) {
+      const g = goalOf(run(n, [1, 5]), minimum)
+      assert.ok(n + g.remaining >= minimum || g.over,
+        `minimum ${minimum} at ${n}: projected ${n + g.remaining}`)
+    }
+  }
+})
+
+/** A ten-question session is judged on its last ten, not on a window it will never fill. */
+test('a shorter session keeps its own window rather than growing toward twenty', () => {
+  const g = goalOf(run(10, [4, 8]), 10)
+  assert.equal(g.window, 10)
+  assert.equal(g.required, 9)
+  assert.equal(g.done, false)
+  // Five more right answers push the older mistake out of a ten-answer window.
+  assert.equal(g.remaining, 5)
+})
+
+/** Brute force says what the arithmetic ought to: the soonest it could end. */
+test('the count to go is exactly the number of right answers it would take', () => {
+  for (const minimum of [10, 20]) {
+    for (const wrong of [[], [0], [3, 4], [8, 9, 10], [17, 18, 19]]) {
+      const verdicts = run(20, wrong)
+      const { remaining } = goalOf(verdicts, minimum)
+      if (remaining === 0) continue
+      const oneShort = goalOf([...verdicts, ...Array(remaining - 1).fill(true)], minimum)
+      const exact = goalOf([...verdicts, ...Array(remaining).fill(true)], minimum)
+      assert.equal(oneShort.done, false, `minimum ${minimum}, wrong ${wrong}: finished early`)
+      assert.equal(exact.done, true, `minimum ${minimum}, wrong ${wrong}: did not finish on time`)
+    }
+  }
+})
