@@ -11,12 +11,17 @@ import {
   addProfile, adoptLegacyRecord, loadProfiles, progressKeyFor, removeProfile, saveProfiles,
   type ProfileState, type ProfileStore,
 } from '@/lib/mastery/profiles'
+import { pickTopic, type Pick } from '@/lib/session/weakest'
 import type { Progress } from '@/lib/mastery/mastery'
 import type { ImplementedSkill } from '@/lib/problems'
 
 /**
  * Four screens: pick who is practising, sit the level check once, see what it
- * decided, then choose a topic and practise.
+ * decided, then practise — on the topic the app chose.
+ *
+ * The child does not pick the topic. Given a list, a learner picks what they
+ * are already good at, which is the one thing practice cannot improve. The
+ * topic map is still there, as somewhere to see how it is going.
  *
  * Progress is read from and written to localStorage only, under a key per
  * profile — the store is per-browser rather than per-person, so a single key
@@ -65,7 +70,16 @@ const progressStoreFor = (profileId: string): KeyValueStore => {
 export function App() {
   const [profiles, setProfiles] = useState<ProfileState | null>(null)
   const [progress, setProgress] = useState<Progress | null>(null)
-  const [skill, setSkill] = useState<ImplementedSkill | null>(null)
+  /**
+   * The topic in hand, FROZEN for the length of the session.
+   *
+   * Deliberately state rather than `pickTopic(progress)` at render time.
+   * Answering a question changes progress, which would change the pick, which
+   * would restart the session from question one — the same shape of bug that
+   * once pinned the counter at 1 / 20.
+   */
+  const [topic, setTopic] = useState<Pick | null>(null)
+  const [showingProgress, setShowingProgress] = useState(false)
   const [showingResult, setShowingResult] = useState(false)
   /** Stamped when the map is shown, not read during render. */
   const [now, setNow] = useState(0)
@@ -85,7 +99,8 @@ export function App() {
      Whose journey to load is only known once a profile is chosen. */
   useEffect(() => {
     setProgress(activeId ? loadProgress(progressStoreFor(activeId)) : null)
-    setSkill(null)
+    setTopic(null)
+    setShowingProgress(false)
     setShowingResult(false)
   }, [activeId])
   /* eslint-enable react-hooks/set-state-in-effect */
@@ -99,6 +114,13 @@ export function App() {
   const persistProfiles = useCallback((next: ProfileState) => {
     saveProfiles(browserProfileStore(), next)
     setProfiles(next)
+  }, [])
+
+  /** Start the next session on whatever is weakest NOW, not when they sat down. */
+  const nextTopic = useCallback((from: Progress) => {
+    setTopic(pickTopic(from))
+    setShowingProgress(false)
+    setNow(Date.now())
   }, [])
 
   if (!profiles) {
@@ -151,7 +173,7 @@ export function App() {
     return (
       <PlacementResult
         progress={progress}
-        onContinue={() => { setNow(Date.now()); setShowingResult(false) }}
+        onContinue={() => { setShowingResult(false); nextTopic(progress) }}
         onRetake={() => {
           setShowingResult(false)
           persist({ ...progress, placed: [], placementDone: false })
@@ -160,27 +182,34 @@ export function App() {
     )
   }
 
-  if (skill) {
+  if (showingProgress) {
     return (
-      <Practice
-        skill={skill}
+      <SkillMap
         progress={progress}
-        onProgress={persist}
-        onLeave={() => { setNow(Date.now()); setSkill(null) }}
-        onPickSkill={setSkill}
+        upNext={topic ?? pickTopic(progress)}
+        onBack={() => nextTopic(progress)}
+        onRetakePlacement={() => persist({ ...progress, placed: [], placementDone: false })}
+        onSessionLength={(sessionLength) => persist({ ...progress, sessionLength })}
+        onSwitchProfile={() => persistProfiles({ ...profiles, activeId: null })}
+        profileName={profiles.profiles.find((p) => p.id === activeId)?.name}
+        now={now}
       />
     )
   }
 
+  const inHand = topic ?? pickTopic(progress)
+
   return (
-    <SkillMap
+    <Practice
+      skill={inHand.skill}
+      reason={inHand.reason}
       progress={progress}
-      onPick={setSkill}
-      onRetakePlacement={() => persist({ ...progress, placed: [], placementDone: false })}
-      onSessionLength={(sessionLength) => persist({ ...progress, sessionLength })}
-      onSwitchProfile={() => persistProfiles({ ...profiles, activeId: null })}
+      onProgress={persist}
+      onNext={() => nextTopic(progress)}
+      onLeave={() => { setNow(Date.now()); setShowingProgress(true) }}
+      onPickSkill={(skill: ImplementedSkill) => setTopic({ skill, reason: 'foundation' })}
       profileName={profiles.profiles.find((p) => p.id === activeId)?.name}
-      now={now}
+      onSwitchProfile={() => persistProfiles({ ...profiles, activeId: null })}
     />
   )
 }

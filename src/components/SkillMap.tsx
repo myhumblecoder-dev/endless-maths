@@ -6,6 +6,7 @@ import { GENERATORS, type ImplementedSkill } from '@/lib/problems'
 import { isSkillMastered, skillProgress, type Progress } from '@/lib/mastery/mastery'
 import { blockedBy, unlockedSkills, weakestDueFirst } from '@/lib/session/scheduler'
 import { SESSION_LENGTHS, sessionLengthOf } from '@/lib/session/length'
+import { topicIsA, type Pick } from '@/lib/session/weakest'
 import type { Strand } from '@/lib/curriculum/types'
 
 const STRAND_LABEL: Record<Strand, string> = {
@@ -18,14 +19,18 @@ const STRAND_LABEL: Record<Strand, string> = {
 }
 
 /**
- * The whole map, always visible. Locked skills are shown but not selectable —
- * seeing what is coming is motivating; being able to faceplant into it is not.
- * Placement is what gets a learner to the right part of the map, not tapping
- * through the locks.
+ * How it is going. A progress view, not a menu.
+ *
+ * Nothing here is tappable any more: the app picks the topic, and offering a
+ * list alongside that would be a lie about who is choosing. What the map is
+ * for now is seeing the shape of the thing — what is done, what is coming, and
+ * why the locked parts are locked, which is motivating in a way that a list of
+ * buttons a child cannot press is not.
  */
 export function SkillMap({
   progress,
-  onPick,
+  upNext,
+  onBack,
   onRetakePlacement,
   onSessionLength,
   onSwitchProfile,
@@ -33,7 +38,10 @@ export function SkillMap({
   now,
 }: {
   progress: Progress
-  onPick: (skill: ImplementedSkill) => void
+  /** The topic the app has chosen, called out so the choice is not a mystery. */
+  upNext: Pick
+  /** Back to practice, on whatever is weakest by then. */
+  onBack: () => void
   onRetakePlacement: () => void
   /** Change how many questions a session runs for. */
   onSessionLength?: (length: number) => void
@@ -79,8 +87,27 @@ export function SkillMap({
         )}
       </div>
       <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-        Every session is mostly the topic you pick, mixed with review of things you have done before.
+        Every session is mostly one topic, mixed with review of things you have done before.
       </p>
+
+      {/*
+        Naming the next topic and the reason for it. Being moved around by an
+        app that will not say why is the thing an older learner resents most,
+        and it is the one thing this screen can fix for free.
+      */}
+      <button
+        type="button"
+        onClick={onBack}
+        className="mt-5 w-full rounded-2xl bg-emerald-600 px-5 py-4 text-left text-white
+                   transition active:scale-[0.99] hover:bg-emerald-700"
+      >
+        <span className="block text-xs font-semibold uppercase tracking-wider text-emerald-100">
+          {topicIsA(upNext.reason)}
+        </span>
+        <span className="mt-0.5 block text-lg font-semibold">
+          {SKILL_BY_ID.get(upNext.skill)?.label ?? 'Practise'}
+        </span>
+      </button>
 
       <div className="mt-6 space-y-7">
         {strands.map((strand) => {
@@ -123,18 +150,21 @@ export function SkillMap({
                     : ''
 
                   return (
-                    <li key={skill.id}>
-                      <button
-                        type="button"
-                        disabled={!open}
-                        onClick={() => onPick(skill.id as ImplementedSkill)}
-                        aria-label={
-                          `${skill.label}${figures ? `. ${figures}` : ''}${open ? '' : ` (locked. ${reason})`}`
-                        }
-                        className={`flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-lg transition
+                    <li
+                      key={skill.id}
+                      // The row carries the label, because the row is the thing
+                      // now — there is no button to hang it on any more, and a
+                      // lock reason in grey text alone is not a channel every
+                      // reader has.
+                      aria-label={
+                        `${skill.label}${figures ? `. ${figures}` : ''}${open ? '' : ` (locked. ${reason})`}`
+                      }
+                    >
+                      <div
+                        className={`flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-lg
                           ${open
-                            ? 'bg-slate-100 text-slate-900 hover:bg-slate-200 active:scale-[0.99] dark:bg-slate-800 dark:text-slate-50 dark:hover:bg-slate-700'
-                            : 'cursor-not-allowed bg-transparent text-slate-300 dark:text-slate-600'}`}
+                            ? 'bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-slate-50'
+                            : 'bg-transparent text-slate-300 dark:text-slate-600'}`}
                       >
                         <span aria-hidden className="w-5 text-center">
                           {done ? '✓' : open ? '●' : '○'}
@@ -160,7 +190,7 @@ export function SkillMap({
                         {done && (dueCount.get(skill.id) ?? 0) === 0 && !figures && (
                           <span className="text-sm text-emerald-600 dark:text-emerald-400">done</span>
                         )}
-                      </button>
+                      </div>
                     </li>
                   )
                 })}

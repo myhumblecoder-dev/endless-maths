@@ -49,7 +49,8 @@ test('the quiz shows its result before the topic map', async () => {
   assert.doesNotMatch(document.body.textContent ?? '', /Session length/i)
 })
 
-test('continuing from the result reaches the topics', async () => {
+/** The app picks the topic, so continuing lands in a session rather than a menu. */
+test('continuing from the result starts practising straight away', async () => {
   render(<App />)
   await settle()
   fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Eddie' } })
@@ -59,7 +60,7 @@ test('continuing from the result reaches the topics', async () => {
 
   fireEvent.click(screen.getByRole('button', { name: /Start practising/i }))
   await settle()
-  await waitFor(() => assert.match(document.body.textContent ?? '', /Topics/))
+  await atPractice()
 })
 
 test('the result is not shown again on the next visit', async () => {
@@ -75,7 +76,7 @@ test('the result is not shown again on the next visit', async () => {
 
   render(<App />)
   await settle()
-  await waitFor(() => assert.match(document.body.textContent ?? '', /Topics/))
+  await atPractice()
   assert.doesNotMatch(document.body.textContent ?? '', /Start practising/,
     'the result belongs to the moment, not to every launch')
 })
@@ -135,6 +136,18 @@ test('adding someone takes them straight into the level check', async () => {
   assert.match(document.body.textContent ?? '', /find your level/i)
 })
 
+/** In a session, which is where the app now opens. */
+const atPractice = () =>
+  waitFor(() => expect(screen.getByRole('button', { name: /See how/i })).toBeTruthy())
+
+/** The map is a progress view now, one tap from whatever they are doing. */
+async function goToProgress() {
+  await atPractice()
+  fireEvent.click(screen.getByRole('button', { name: /See how/i }))
+  await settle()
+  await waitFor(() => assert.match(document.body.textContent ?? '', /Topics/))
+}
+
 test('two children keep separate journeys on one device', async () => {
   render(<App />)
   await settle()
@@ -148,6 +161,7 @@ test('two children keep separate journeys on one device', async () => {
   assert.ok(localStorage.getItem(progressKeyFor(eddie)), "Eddie's journey is under his own key")
 
   // Ethan starts fresh rather than inheriting Eddie's placement.
+  await goToProgress()
   fireEvent.click(screen.getByRole('button', { name: /Switch/i }))
   await settle()
   await addSomeone('Ethan')
@@ -166,7 +180,7 @@ test('the active profile is remembered on the next visit', async () => {
 
   render(<App />)
   await settle()
-  await waitFor(() => assert.match(document.body.textContent ?? '', /Topics/))
+  await atPractice()
   assert.doesNotMatch(document.body.textContent ?? '', /who.s practising/i,
     'a child should not pick themselves out of a list every single time')
 })
