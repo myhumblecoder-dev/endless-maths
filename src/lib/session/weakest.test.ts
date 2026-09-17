@@ -2,7 +2,7 @@ import { test } from 'vitest'
 import assert from 'node:assert/strict'
 import { pickTopic, strengthOf, topicIsA } from './weakest'
 import { emptyProgress, record, type Progress } from '@/lib/mastery/mastery'
-import { setDifficulty } from '@/lib/mastery/levels'
+import { recordPass, setDifficulty } from '@/lib/mastery/levels'
 import type { ImplementedSkill } from '@/lib/problems'
 import type { SkillId } from '@/lib/curriculum/types'
 
@@ -82,18 +82,40 @@ test('the same accuracy is worth less at a lower level', () => {
 test('a topic beaten only at simple keeps coming back, ahead of anything new', () => {
   let p = placed('n-round', 'n-place-value-1000', 'n-place-value-100')
   p = practised(p, 'n-round', 10, 0)
-  p = setDifficulty(p, 'n-round', 'simple')
+  p = recordPass(p, 'n-round', 'simple')
 
   const pick = pickTopic(p)
   assert.equal(pick.skill, 'n-round', 'beating the easy version is not beating the topic')
   assert.equal(pick.reason, 'climbing')
 })
 
+/**
+ * What they were PROVED at, not what they are queued to be asked next. Beating
+ * the simple version steps the level back up to medium, and reading the queued
+ * level would count that as having done it at medium before a single question
+ * there had been answered.
+ */
+test('the level queued for next time is not what settles a topic', () => {
+  let p = placed('n-round', 'n-place-value-1000', 'n-place-value-100')
+  p = practised(p, 'n-round', 10, 0)
+  p = recordPass(p, 'n-round', 'simple')
+  p = setDifficulty(p, 'n-round', 'medium') // stepped up after beating the easy one
+
+  assert.equal(pickTopic(p).skill, 'n-round', 'the debt is still owed')
+})
+
 test('getting back to the normal level settles it', () => {
   let p = placed('n-round', 'n-place-value-1000', 'n-place-value-100')
   p = practised(p, 'n-round', 10, 0)
+  p = recordPass(p, 'n-round', 'medium')
   assert.notEqual(pickTopic(p).skill, 'n-round',
     'a topic passed at the usual difficulty is finished with for now')
+})
+
+/** Placement, and every record written before levels existed, is taken at face value. */
+test('a topic with nothing recorded is settled on mastery alone', () => {
+  const p = practised(placed('n-round', 'n-place-value-1000', 'n-place-value-100'), 'n-round', 10, 0)
+  assert.notEqual(pickTopic(p).skill, 'n-round')
 })
 
 /**

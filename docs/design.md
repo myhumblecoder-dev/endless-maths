@@ -72,8 +72,12 @@ device" below.**
 
 The product is called Endless Maths, but a seven-year-old needs a finish line.
 Infinite scroll is demotivating — there is no moment of "I did it". The
-*supply* is endless; a *session* is ~20 problems or five minutes, with a visible
-progress bar and a clear end.
+*supply* is endless; a *session* is bounded, with a visible progress bar and a
+clear end.
+
+**Revised.** "~20 problems" became "until 90% of the last twenty are right,
+starting at twenty and capped at sixty" — see *Directed practice* below. The
+finish line is still visible and still real; it just moves.
 
 ## Can we really go from counting to pre-algebra?
 
@@ -363,6 +367,82 @@ genuine beginner places out of nothing and must not be handed the quiz forever.
 selectable — seeing what is coming motivates, faceplanting into it does not.
 Placement is what moves a learner across the map, not tapping through locks.
 
+## Directed practice
+
+Added after both boys had used it for a week. Three rules that only make sense
+together.
+
+### The child does not choose the topic
+
+Given a list, a learner picks what they are already good at — the one thing
+practice cannot improve. So the app picks, and it picks their weakest. The
+topic map stays, as somewhere to see how it is going, with nothing on it
+tappable: offering a menu beside a decision the app has already made would be a
+lie about who is choosing.
+
+Every pick says **why**. Being moved around by an app that will not explain
+itself is the thing an older learner resents, and it costs nothing to fix.
+
+### A session ends at 90%, not at a count
+
+Eighteen of the last twenty. Wrong answers buy more questions; getting better
+buys fewer.
+
+The rolling window is load-bearing. Cumulative 90% requires
+`total >= 10 x wrong`, so below 90% accuracy the finish line recedes faster
+than the learner approaches it — unreachable as arithmetic, not merely hard.
+Simulated at 80% accuracy, three sessions in four never terminate. Since the
+picker deliberately hands a child their *weakest* topic, a cumulative rule
+would trap precisely the learner it was built for. A window bounds the cost of
+a mistake: it costs work until it falls out of the last twenty, then nothing.
+
+| Their accuracy | Questions | Time |
+| --- | --- | --- |
+| 95% | 20 | ~3 min |
+| 85% | 24 | ~3 min |
+| 80% | 38 | ~5 min |
+| 70% | 60 (capped) | ~8 min |
+
+A bad day costs three times the work of a good one and tops out around eight
+minutes. That was the target: suffering, but not enough to pull their hair out.
+
+### Each topic has three difficulties, and the outcome moves them
+
+Difficulty already existed in two places — *between* topics, where the skill
+graph is the difficulty system, and *within fact topics*, where every fact has
+its own Leitner box. The gap was procedure topics, which drew from one fixed
+band.
+
+Run out of questions and the level drops. Finish without needing an extra one
+and it rises. The levels are different *questions*, not bigger numbers:
+three-digit addition is graded by how many columns carry, equations by whether
+the coefficient is negative, fractions by the denominator. `800 + 100` is
+easier than `476 + 385`, and `7 x 8` is harder than `10 x 12`, so operand
+magnitude is the wrong proxy for everything that matters.
+
+**The drop must be a way through a topic, not a way out of it.** Two things
+enforce that. Weakness is scaled by the level a score was earned at, so 95% of
+the simple version is worth less than 95% of the hard one. And progress records
+the level a topic was last *passed* at separately from the level it will be
+*asked* at next — they differ by exactly one session, and conflating them let a
+child clear a topic for good by failing it once and then beating the
+concession.
+
+Passing at simple restores the normal level however long it took, because
+simple is a concession and passing it ends the concession. Only climbing
+*above* the normal level has to be earned cleanly.
+
+Hitting the cap is **deferral, not mercy, and not a pass**. The topic is still
+their weakest and still comes back.
+
+### Being told
+
+Every one of these changes is announced, and only when it is real. A topic with
+one band is never said to have moved, and neither is one already at the bottom.
+Telling a child the work got easier and then handing them identical questions
+is worse than saying nothing — it is the one thing that would make the whole
+mechanism untrustworthy.
+
 ## Open questions
 
 See `research.md` — prior art has since settled two of these and reversed two
@@ -375,5 +455,12 @@ decisions recorded above (the expression engine's cost, and blocked practice).
   sustained accuracy auto-promote?
 - Sound and animation — motivating for this age group, but a hard accessibility
   and classroom-use constraint.
-- One child per device, or a lightweight local profile switcher for siblings and
-  classroom tablets?
+- ~~One child per device, or a lightweight local profile switcher for siblings
+  and classroom tablets?~~ **Settled — a profile per child, each with its own
+  storage key. Names are local and never leave the device.**
+- Attempts are discarded when a session ends. What a child answered when they
+  were wrong is the most useful signal there is, and the only one not kept
+  (#55).
+- The session-length preference (10/20/40) now sets the *minimum* rather than
+  the length. With the app choosing the topic too, it is not clear the choice
+  still earns its place on the screen.

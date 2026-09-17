@@ -1,6 +1,6 @@
 import { test } from 'vitest'
 import assert from 'node:assert/strict'
-import { difficultyFor, setDifficulty, easeOff, stepUp } from './levels'
+import { difficultyFor, setDifficulty, easeOff, stepUp, provenAt, recordPass } from './levels'
 import { emptyProgress } from './mastery'
 import { loadProgress, saveProgress, type KeyValueStore } from './storage'
 
@@ -73,4 +73,36 @@ test('a record written before levels existed still loads', () => {
   const kv = store()
   saveProgress(kv, emptyProgress())
   assert.doesNotThrow(() => difficultyFor(loadProgress(kv), 'a-add-3digit'))
+})
+
+// ---- what they have proved, as against what comes next ---------------------
+
+test('a topic nobody has passed has nothing recorded', () => {
+  assert.equal(provenAt(emptyProgress(), 'a-add-3digit'), undefined)
+})
+
+test('what they passed at is remembered separately from what comes next', () => {
+  let p = recordPass(emptyProgress(), 'a-add-3digit', 'simple')
+  p = setDifficulty(p, 'a-add-3digit', 'medium')
+
+  assert.equal(provenAt(p, 'a-add-3digit'), 'simple', 'what they have actually done')
+  assert.equal(difficultyFor(p, 'a-add-3digit'), 'medium', 'what they will be asked next')
+})
+
+test('a pass survives a save and a reload', () => {
+  const kv = store()
+  saveProgress(kv, recordPass(emptyProgress(), 'a-add-3digit', 'simple'))
+  assert.equal(provenAt(loadProgress(kv), 'a-add-3digit'), 'simple')
+})
+
+test('a corrupt pass falls back to nothing recorded rather than crashing', () => {
+  const kv = store()
+  saveProgress(kv, { ...emptyProgress(), proven: { 'a-add-3digit': 'nonsense' } } as never)
+  assert.equal(provenAt(loadProgress(kv), 'a-add-3digit'), undefined)
+})
+
+test('a topic with no levels records nothing to prove', () => {
+  const p = recordPass(emptyProgress(), 'm-times-6-7-8-9', 'medium')
+  assert.equal(provenAt(p, 'm-times-6-7-8-9'), undefined,
+    'a times table has one band — there is nothing to have proved it at')
 })

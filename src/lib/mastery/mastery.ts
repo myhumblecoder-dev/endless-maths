@@ -53,6 +53,13 @@ export type Progress = {
    * mastery/levels.ts and problems/difficulty.ts.
    */
   levels?: Partial<Record<SkillId, Difficulty>>
+  /**
+   * The level each topic was last PASSED at, which is not the same as the level
+   * it will be asked at next. A topic dropped to simple and then beaten steps
+   * back up to medium — but it has still only been proved at simple, and the
+   * picker needs to know that or the drop becomes a way out of the topic.
+   */
+  proven?: Partial<Record<SkillId, Difficulty>>
 }
 
 export const emptyProgress = (): Progress => ({
