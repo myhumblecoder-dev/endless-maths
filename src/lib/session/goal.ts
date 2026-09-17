@@ -73,39 +73,47 @@ export function goalOf(verdicts: readonly boolean[], minimum = SESSION_WINDOW): 
   const answered = verdicts.length
   const cap = Math.max(SESSION_CAP, minimum)
 
-  const window = Math.min(answered, SESSION_WINDOW)
-  const recent = verdicts.slice(answered - window)
-  const right = recent.filter(Boolean).length
+  /**
+   * A ten-question session is judged on its last ten, not on a twenty-answer
+   * window it would never fill. The window is fixed by the session's length,
+   * not by how far into it the learner has got — a window that grows as they
+   * answer would raise the bar every time they cleared it.
+   */
+  const full = Math.min(minimum, SESSION_WINDOW)
+  const window = Math.min(answered, full)
+  const right = verdicts.slice(answered - window).filter(Boolean).length
   const required = Math.ceil(window * ACCURACY)
 
   /**
-   * The soonest this could end.
+   * Whether `k` further right answers would finish it.
    *
-   * A wrong answer stops mattering once it drops out of the window, so the work
-   * left is set by WHERE the mistakes are, not how many there have been. With
-   * mistakes at positions p (1 = most recent) and `allowed` of them tolerated,
-   * the session can end as soon as every mistake beyond the allowance has aged
-   * out: `SESSION_WINDOW + 1 - p` further right answers, for the oldest one
-   * that still has to go.
+   * Stated as the rule itself rather than as arithmetic about where the
+   * mistakes are. The clever version hard-coded the twenty-answer allowance
+   * while `required` scaled with the window in force, so a ten-question
+   * session with two wrong reported nothing left to do while still running —
+   * the counter read `11 / 10`, then `12 / 11`. The definition cannot drift
+   * from itself.
    */
-  const allowed = SESSION_WINDOW - Math.ceil(SESSION_WINDOW * ACCURACY)
-  const mistakes = verdicts
-    .slice(Math.max(0, answered - SESSION_WINDOW))
-    .flatMap((ok, i, xs) => (ok ? [] : [xs.length - i])) // position from the end, 1-based
-  const mustAgeOut = mistakes[mistakes.length - 1 - allowed]
-  const toFlush = mustAgeOut === undefined ? 0 : SESSION_WINDOW + 1 - mustAgeOut
+  const finishedAfter = (k: number): boolean => {
+    const total = answered + k
+    if (total < minimum) return false
+    const w = Math.min(total, full)
+    const kept = Math.max(0, w - k) // how much of the existing run is still in view
+    const carried = verdicts.slice(answered - kept).filter(Boolean).length
+    return Math.min(k, w) + carried >= Math.ceil(w * ACCURACY)
+  }
 
-  const done = answered >= minimum && window >= Math.min(minimum, SESSION_WINDOW) && right >= required
+  const done = finishedAfter(0)
   const reachedCap = !done && answered >= cap
 
-  return {
-    window,
-    right,
-    required,
-    // Never promise more questions than the session is allowed to ask.
-    remaining: done ? 0 : Math.min(Math.max(toFlush, minimum - answered), cap - answered),
-    done,
-    reachedCap,
-    over: done || reachedCap,
+  // Never promise more questions than the session is allowed to ask. If no
+  // number of right answers finishes it, the cap is the answer.
+  let remaining = cap - answered
+  for (let k = 0; k <= cap - answered; k++) {
+    if (!finishedAfter(k)) continue
+    remaining = k
+    break
   }
+
+  return { window, right, required, remaining, done, reachedCap, over: done || reachedCap }
 }

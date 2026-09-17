@@ -2,7 +2,7 @@ import { test } from 'vitest'
 import assert from 'node:assert/strict'
 import { startSession, answer, currentProblem, isComplete, summary, goalOfSession } from './session'
 import { SESSION_CAP } from './goal'
-import { emptyProgress } from '@/lib/mastery/mastery'
+import { emptyProgress, record } from '@/lib/mastery/mastery'
 import type { SkillId } from '@/lib/curriculum/types'
 import { seeded } from '@/lib/problems'
 import { formatAnswer } from '@/lib/problems/format'
@@ -20,8 +20,11 @@ const experienced = () => ({
   placementDone: true,
 })
 
+/** A day after the recorded attempts, so anything owed is genuinely due. */
+const LATER = 24 * 60 * 60 * 1000
+
 const start = (seed = 42, progress = emptyProgress()) =>
-  startSession(progress, seeded(seed), { skill: 'a-add-within-20', now: 0 })
+  startSession(progress, seeded(seed), { skill: 'a-add-within-20', now: LATER })
 
 const right = (s: Session): Session => {
   const p = currentProblem(s)
@@ -134,4 +137,114 @@ test('the projected total grows when they slip and shrinks as they recover', () 
 test('the projected total is never a promise past the cap', () => {
   const s = play(3, 2)
   assert.ok(summary(s).total <= SESSION_CAP)
+})
+
+// ---- findings from code review ---------------------------------------------
+
+/**
+ * The plan grows a block at a time, and the run-smoothing pass only ever saw
+ * the fresh block — so slots 0 and 1 of each new block were never compared
+ * against the tail of the one before. The generation loop cannot repair it
+ * either: once a slot names a skill, every redraw returns that same skill, so
+ * the retry spins through all its attempts and accepts the run anyway.
+ *
+ * "Six number bonds in a row reads as a broken app" is why the constraint
+ * exists; a seam every twenty questions is where it was breaking.
+ */
+test('the variety rules hold across a block seam, not just within a block', () => {
+  for (const seed of [1, 2, 3, 5, 8, 13, 21, 34]) {
+    const s = play(seed, 1, experienced()) // everything wrong: runs to the cap
+    const skills = s.problems.map((p) => p.skill)
+    for (let i = 2; i < skills.length; i++) {
+      assert.ok(!(skills[i] === skills[i - 1] && skills[i] === skills[i - 2]),
+        `seed ${seed}: three ${skills[i]} in a row at index ${i}`)
+    }
+  }
+})
+
+/**
+ * Every block re-planned the SAME due facts, because each call saw the
+ * original progress. Those slots then collided with what had already been
+ * asked, so each one burned its way through every retry before settling for a
+ * repeat — and a fact the learner had just answered was scheduled again as
+ * though it were still owed.
+ */
+test('a due fact is targeted once, not once per block', () => {
+  // A fact answered wrong is due, and stays due until it is met again. A bond
+  // to ten, because targeting a specific fact means drawing until it comes up:
+  // there are nine of those, against 247 sums within twenty, so this actually
+  // lands inside the attempts a session gives it.
+  const progress = record({ ...experienced() }, {
+    problemId: 'x', skill: 'n-bonds-10', factKey: 'bond10:4',
+    given: '7', verdict: 'incorrect', elapsedMs: 1000, at: 0,
+  })
+
+  const s = play(4, 1, progress)
+  const targeted = s.problems.filter((p) => p.factKey === 'bond10:4').length
+  assert.ok(targeted >= 1, 'a missed fact must come back at all — otherwise this proves nothing')
+  assert.ok(targeted <= 2,
+    `the same fact was scheduled ${targeted} times in one session`)
+})
+
+/**
+ * An unsimplified answer is right but unfinished, so the learner stays on the
+ * question and `Practice` throws the resulting session away. `answer` had
+ * already drawn the replacement though — the seeded rng had moved on and a
+ * prompt nobody ever saw was marked as asked, suppressing it for the rest of
+ * the session.
+ */
+test('an answer that does not finish the problem does not draw the next one', () => {
+  // One problem, so answering it sits exactly on the boundary where the next
+  // one would be drawn. 4/12 + 2/12 is 6/12, which is right but not finished.
+  const s = fractionSession(4, 1)
+  const discarded = answer(s, unsimplifiedFor(s), 1000, 0)
+
+  assert.equal(discarded.attempts[0].verdict, 'equivalent-unsimplified',
+    'the premise of this test is that the answer does not complete the problem')
+  assert.equal(discarded.problems.length, s.problems.length,
+    'staying on the same question must not consume the next one')
+})
+
+test('a discarded attempt leaves the seeded run exactly where it was', () => {
+  const slipped = fractionSession(4, 1)
+  answer(slipped, unsimplifiedFor(slipped), 1000, 0) // thrown away, as Practice does
+  const clean = fractionSession(4, 1)
+
+  // `draw` is the shared state: the seeded rng, and what has been asked. If the
+  // discarded attempt moved either, the next question differs.
+  assert.equal(
+    slipped.draw(slipped.problems).prompt,
+    clean.draw(clean.problems).prompt,
+    'a seeded run must not diverge because of an answer that was never kept',
+  )
+})
+
+const fractionSession = (seed: number, length?: number) =>
+  startSession(
+    { ...emptyProgress(), placementDone: true, placed: ['f-add-like'] as SkillId[] },
+    seeded(seed),
+    { skill: 'f-add-like', length, now: 0 },
+  )
+
+/** `a/d + b/d` before reducing — right, but not finished. */
+function unsimplifiedFor(s: Session): string {
+  const problem = currentProblem(s)
+  assert.ok(problem)
+  const [, a, den, b] = /^(\d+)\/(\d+) \+ (\d+)\/\2$/.exec(problem.prompt) ?? []
+  assert.ok(den, `expected a like-denominator sum, got "${problem.prompt}"`)
+  return `${Number(a) + Number(b)}/${den}`
+}
+
+/** Wider sweep: the seam fix must not be a fix for eight lucky seeds. */
+test('no session at any length runs a skill three times in a row', () => {
+  for (let seed = 1; seed <= 60; seed++) {
+    for (const every of [1, 2, 3, 5]) {
+      const s = play(seed, every, experienced())
+      const skills = s.problems.map((p) => p.skill)
+      for (let i = 2; i < skills.length; i++) {
+        assert.ok(!(skills[i] === skills[i - 1] && skills[i] === skills[i - 2]),
+          `seed ${seed}, one wrong in ${every}: three ${skills[i]} in a row at ${i}`)
+      }
+    }
+  }
 })
