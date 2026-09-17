@@ -184,3 +184,58 @@ test('the active profile is remembered on the next visit', async () => {
   assert.doesNotMatch(document.body.textContent ?? '', /who.s practising/i,
     'a child should not pick themselves out of a list every single time')
 })
+
+/**
+ * The topic must not change out from under a session in progress.
+ *
+ * It was being recomputed at render time, and answering a question changes what
+ * is weakest — so on a fresh launch, which is every launch, the app swapped
+ * topic after one question and started the count again. The same shape of bug
+ * as the session that used to restart on every answer.
+ */
+test('the topic stays put while a session is being answered', async () => {
+  seedJourney()
+  render(<App />)
+  await settle()
+  await atPractice()
+
+  const topicAtStart = topicOnScreen()
+  assert.ok(topicAtStart, 'a session should be under way')
+
+  for (let i = 0; i < 4; i++) {
+    fireEvent.keyDown(window, { key: '0' })
+    fireEvent.keyDown(window, { key: 'Enter' })
+    await act(async () => {})
+  }
+
+  assert.equal(topicOnScreen(), topicAtStart,
+    'answering must not hand them a different topic half way through')
+  assert.doesNotMatch(document.body.textContent ?? '', /·\s*1 \/ 20/,
+    'nor start the count again')
+})
+
+/** The label in the back link, which names the topic in hand. */
+const topicOnScreen = () =>
+  screen.getByRole('button', { name: /See how/i }).textContent?.replace('←', '').trim()
+
+/** A learner part way through, weak at one topic and placed through to it. */
+function seedJourney() {
+  const id = 'p_seed'
+  localStorage.setItem(PROFILES_KEY, JSON.stringify({
+    profiles: [{ id, name: 'Eddie' }], activeId: id,
+  }))
+  localStorage.setItem(progressKeyFor(id), JSON.stringify({
+    facts: {},
+    skills: {
+      'a-add-3digit': {
+        skill: 'a-add-3digit', attempts: 14,
+        recent: [false, true, false, false, true, false, true, false, false, false],
+        lastSeenAt: 0,
+      },
+    },
+    placed: ['n-bonds-10', 'n-compare-20', 'n-place-value-100', 'n-place-value-1000', 'n-round',
+      'a-add-within-10', 'a-sub-within-10', 'a-add-within-20', 'a-sub-within-20',
+      'a-add-2digit', 'a-add-2digit-regroup', 'a-sub-2digit', 'a-sub-2digit-regroup', 'a-add-3digit'],
+    placementDone: true,
+  }))
+}

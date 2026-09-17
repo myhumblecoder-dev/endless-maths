@@ -98,8 +98,18 @@ export function App() {
   /* eslint-disable react-hooks/set-state-in-effect --
      Whose journey to load is only known once a profile is chosen. */
   useEffect(() => {
-    setProgress(activeId ? loadProgress(progressStoreFor(activeId)) : null)
-    setTopic(null)
+    const loaded = activeId ? loadProgress(progressStoreFor(activeId)) : null
+    setProgress(loaded)
+    /**
+     * Pick the topic HERE, with the journey, not at render time.
+     *
+     * Leaving it null and falling back to `pickTopic(progress)` in the render
+     * meant it was recomputed on every answer — and answering changes what is
+     * weakest, so the topic could change out from under a session in progress.
+     * On a fresh launch, which is every launch, it swapped topic after one
+     * question and restarted the count.
+     */
+    setTopic(loaded?.placementDone ? pickTopic(loaded) : null)
     setShowingProgress(false)
     setShowingResult(false)
   }, [activeId])
@@ -197,12 +207,16 @@ export function App() {
     )
   }
 
-  const inHand = topic ?? pickTopic(progress)
+  // Set alongside the journey it was chosen from, so this is only ever the one
+  // frame between mount and that effect running.
+  if (!topic) {
+    return <main className="grid min-h-dvh place-items-center text-slate-400">Loading…</main>
+  }
 
   return (
     <Practice
-      skill={inHand.skill}
-      reason={inHand.reason}
+      skill={topic.skill}
+      reason={topic.reason}
       progress={progress}
       onProgress={persist}
       onNext={() => nextTopic(progress)}
