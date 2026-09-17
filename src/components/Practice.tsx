@@ -3,13 +3,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Keypad } from './Keypad'
 import { Maths } from './Maths'
-import { answer as submitAnswer, completesProblem, currentProblem, isComplete, startSession, summary, type Session } from '@/lib/session/session'
+import { answer as submitAnswer, completesProblem, currentProblem, goalOfSession, isComplete, startSession, summary, type Session } from '@/lib/session/session'
+import { adaptDifficulty, levelNews, type LevelChange } from '@/lib/session/adapt'
 import { canSubmit as entryCanSubmit, choiceForKey, isEntryKey, press } from '@/lib/session/keypad'
 import type { Verdict } from '@/lib/curriculum/types'
 import { feedbackText, formatAnswer } from '@/lib/problems/format'
 import { seeded } from '@/lib/problems'
 import { SKILL_BY_ID } from '@/lib/curriculum/skills'
 import { gapBehind } from '@/lib/session/diagnose'
+import { topicIsA, type PickReason } from '@/lib/session/weakest'
 import type { Progress } from '@/lib/mastery/mastery'
 import type { ImplementedSkill } from '@/lib/problems'
 
@@ -25,11 +27,26 @@ type Feedback = { verdict: Verdict; expected: string }
 
 type Props = {
   skill: ImplementedSkill
+  /** Why this topic. The app chose it; being told why is the difference
+   *  between being guided and being pushed around. */
+  reason?: PickReason
   progress: Progress
   onProgress: (progress: Progress) => void
+  /** Move on to whatever is weakest now — which may well be this again. */
+  onNext?: () => void
   onLeave: () => void
   /** Jump straight to another skill — used by the gap suggestion. */
   onPickSkill?: (skill: ImplementedSkill) => void
+  /**
+   * Whose session this is, and how to hand the device over.
+   *
+   * On screen because the app now opens straight into a session: a sibling
+   * picking the device up lands mid-someone-else's topic, and if they answer
+   * first it goes into the wrong journey — the exact mixing profiles exist to
+   * stop. Seeing the name is what prevents it.
+   */
+  profileName?: string
+  onSwitchProfile?: () => void
   /**
    * Fix the session seed. Omitted in the app (the clock supplies it), set in
    * tests — and the hook a "replay this session" feature would use, since the
@@ -38,11 +55,16 @@ type Props = {
   seed?: number
 }
 
-export function Practice({ skill, progress, onProgress, onLeave, onPickSkill, seed }: Props) {
+export function Practice({
+  skill, reason, progress, onProgress, onNext, onLeave, onPickSkill,
+  profileName, onSwitchProfile, seed,
+}: Props) {
   // Session seeding uses the clock, so the first render must be server-safe.
   const [session, setSession] = useState<Session | null>(null)
   const [entry, setEntry] = useState('')
   const [feedback, setFeedback] = useState<Feedback | null>(null)
+  /** Set once, when a session ends and the level moves. Told, never silent. */
+  const [levelChange, setLevelChange] = useState<LevelChange | null>(null)
   const shownAt = useRef<number>(0)
   /** The session as it will be once the current feedback finishes. */
   const pending = useRef<Session | null>(null)
@@ -81,6 +103,7 @@ export function Practice({ skill, progress, onProgress, onLeave, onPickSkill, se
     setSession(startSession(latestProgress.current, seeded(seed ?? Date.now()), { skill, now: Date.now() }))
     setEntry('')
     setFeedback(null)
+    setLevelChange(null)
     shownAt.current = Date.now()
   }, [skill, seed])
 
@@ -112,11 +135,25 @@ export function Practice({ skill, progress, onProgress, onLeave, onPickSkill, se
       return
     }
 
-    onProgress(next.progress)
-    pending.current = next
+    /**
+     * The end of a session is when the level for this topic moves — down if
+     * they ran out of questions, up if they never needed an extra one. Applied
+     * here, on the answer that finishes it, because this is the only moment
+     * that knows both the outcome and the topic it belonged to.
+     */
+    const adapted = isComplete(next)
+      ? adaptDifficulty(next.progress, skill, goalOfSession(next), next.attempts, next.minimum)
+      : null
+    const saved = adapted?.progress ?? next.progress
+
+    onProgress(saved)
+    if (adapted?.change) setLevelChange(adapted.change)
+    // The session carries the same progress that was persisted, so the gap
+    // suggestion below is reading the state the learner actually has.
+    pending.current = adapted ? { ...next, progress: saved } : next
     timer.current = window.setTimeout(
       advance, verdict === 'correct' ? FEEDBACK_CORRECT_MS : FEEDBACK_WRONG_MS)
-  }, [session, feedback, onProgress, advance])
+  }, [session, feedback, onProgress, advance, skill])
 
   const onKey = useCallback((key: string) => {
     if (feedback || !problem) return
@@ -188,9 +225,27 @@ export function Practice({ skill, progress, onProgress, onLeave, onPickSkill, se
       <main className="mx-auto grid min-h-dvh max-w-md place-items-center p-6 text-center">
         <div className="w-full">
           <p className="text-6xl font-bold tabular-nums text-slate-900 dark:text-slate-50">
-            {stats.correct}<span className="text-slate-400 dark:text-slate-500">/{stats.total}</span>
+            {stats.correct}<span className="text-slate-400 dark:text-slate-500">/{stats.answered}</span>
           </p>
           <h1 className="mt-3 text-xl font-semibold text-slate-600 dark:text-slate-300">{label}</h1>
+          {/*
+            Reaching the cap is a deferral, not a failure, and not mercy either:
+            the topic is still their weakest and comes back. Saying "that's
+            enough for today" is the truth; "well done" would not be.
+          */}
+          <p className="mt-2 text-sm font-medium text-slate-500 dark:text-slate-400">
+            {stats.goal.reachedCap
+              ? "That's enough for today. We'll pick this one up again next time."
+              : 'Nine out of ten. That was the goal.'}
+          </p>
+          {/*
+            Being quietly given easier work is worse than being told. Said in
+            terms of what the next session will feel like, and only when the
+            level genuinely moved — see adapt.ts.
+          */}
+          {levelChange && (
+            <p className="mt-1 text-sm text-sky-700 dark:text-sky-400">{levelNews(levelChange)}</p>
+          )}
           {median !== null && (
             <p className="mt-1 text-sm text-slate-400 dark:text-slate-500">
               {(median / 1000).toFixed(1)}s per question
@@ -214,13 +269,18 @@ export function Practice({ skill, progress, onProgress, onLeave, onPickSkill, se
           )}
 
           <div className="mt-8 space-y-3">
+            {/*
+              "Keep going", not "Again": what comes next is the app's call, and
+              it may well be this same topic. Saying "Again" would promise a
+              repeat and then sometimes hand them something else.
+            */}
             <button
               type="button"
-              onClick={begin}
+              onClick={onNext ?? begin}
               className="h-14 w-full rounded-2xl bg-emerald-600 text-lg font-semibold text-white
                          transition active:scale-95 hover:bg-emerald-700"
             >
-              Again
+              Keep going
             </button>
             <button
               type="button"
@@ -228,8 +288,19 @@ export function Practice({ skill, progress, onProgress, onLeave, onPickSkill, se
               className="h-14 w-full rounded-2xl text-lg font-semibold text-slate-500
                          transition hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
             >
-              Choose another topic
+              See how I&apos;m doing
             </button>
+            {/* The end of a session is when the device actually changes hands. */}
+            {onSwitchProfile && (
+              <button
+                type="button"
+                onClick={onSwitchProfile}
+                className="h-12 w-full rounded-2xl text-base font-semibold text-slate-400
+                           transition hover:bg-slate-100 dark:text-slate-500 dark:hover:bg-slate-800"
+              >
+                Switch to someone else
+              </button>
+            )}
           </div>
         </div>
       </main>
@@ -246,12 +317,22 @@ export function Practice({ skill, progress, onProgress, onLeave, onPickSkill, se
           <button
             type="button"
             onClick={onLeave}
-            className="-ml-1 rounded px-1 hover:text-slate-900 dark:hover:text-slate-100"
-            aria-label="Back to the topic list"
+            className="-ml-1 truncate rounded px-1 hover:text-slate-900 dark:hover:text-slate-100"
+            aria-label="See how I'm doing"
           >
             ← {label}
           </button>
-          <span>{session.index + 1} / {session.problems.length}</span>
+          {/*
+            The finish line moves, so the counter says so. Freezing it at
+            "/ 20" while the session quietly continued past twenty would read
+            as a broken app — and the child would have no idea what to do about
+            it. Getting them right is what brings this number down.
+          */}
+          <span className="shrink-0 tabular-nums">
+            {/* A separator, or "Adding two-digit numbers Eddie" reads as one phrase. */}
+            {profileName && <span className="text-slate-400 dark:text-slate-500">{profileName} · </span>}
+            {stats.answered + 1} / {stats.total}
+          </span>
         </div>
 
         {/*
@@ -261,12 +342,24 @@ export function Practice({ skill, progress, onProgress, onLeave, onPickSkill, se
           the one they chose.
         */}
         <p className="mt-2 h-5 text-xs text-slate-400 dark:text-slate-500">
-          {problem.skill !== skill && `Review · ${SKILL_BY_ID.get(problem.skill)?.label ?? ''}`}
+          {problem.skill !== skill
+            ? `Review · ${SKILL_BY_ID.get(problem.skill)?.label ?? ''}`
+            : reason && topicIsA(reason)}
         </p>
+        {/*
+          Only once they are past the minimum and the session is still going.
+          Before that "12 / 20" explains itself; after it, a counter that keeps
+          moving needs a reason attached, and the reason is the actual rule.
+        */}
+        {stats.answered >= session.minimum && (
+          <p className="mt-1 text-xs font-medium text-amber-700 dark:text-amber-500">
+            {stats.goal.right} of your last {stats.goal.window} right · {stats.goal.required} needed
+          </p>
+        )}
         <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
           <div
             className="h-full rounded-full bg-emerald-500 transition-all duration-300"
-            style={{ width: `${(session.index / session.problems.length) * 100}%` }}
+            style={{ width: `${(stats.answered / Math.max(stats.total, 1)) * 100}%` }}
           />
         </div>
       </div>

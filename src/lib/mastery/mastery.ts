@@ -6,7 +6,7 @@
  * that never leaves the device cannot trigger COPPA.
  */
 
-import type { Attempt, FactState, SkillId, SkillState } from '@/lib/curriculum/types'
+import type { Attempt, Difficulty, FactState, SkillId, SkillState } from '@/lib/curriculum/types'
 
 /**
  * A fact answered more slowly than this was worked out, not recalled. Three
@@ -47,6 +47,19 @@ export type Progress = {
   placementDone: boolean
   /** Chosen session length. Absent means the default; see session/length.ts. */
   sessionLength?: number
+  /**
+   * How hard each topic is currently asked. Absent, or absent for a topic,
+   * means `medium`. Only topics that genuinely vary appear here; see
+   * mastery/levels.ts and problems/difficulty.ts.
+   */
+  levels?: Partial<Record<SkillId, Difficulty>>
+  /**
+   * The level each topic was last PASSED at, which is not the same as the level
+   * it will be asked at next. A topic dropped to simple and then beaten steps
+   * back up to medium — but it has still only been proved at simple, and the
+   * picker needs to know that or the drop becomes a way out of the topic.
+   */
+  proven?: Partial<Record<SkillId, Difficulty>>
 }
 
 export const emptyProgress = (): Progress => ({

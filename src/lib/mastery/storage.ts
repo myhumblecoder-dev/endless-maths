@@ -32,7 +32,16 @@ const normalise = (p: Progress): Progress => ({
   // without one — an explicit `undefined` key is not the same object.
   // The value itself is validated on read; see session/length.ts.
   ...(p.sessionLength === undefined ? {} : { sessionLength: p.sessionLength }),
+  // Same treatment, and for the same reason: a record from before levels
+  // existed stays without the key. Each value is validated on read, in
+  // mastery/levels.ts, so a hand-edited or half-migrated record cannot hand a
+  // generator a level it does not understand.
+  ...(plainObject(p.levels) ? { levels: p.levels } : {}),
+  ...(plainObject(p.proven) ? { proven: p.proven } : {}),
 })
+
+const plainObject = (x: unknown): boolean =>
+  typeof x === 'object' && x !== null && !Array.isArray(x)
 
 /**
  * Never throws. A mangled record costs the child their history, which is

@@ -1,10 +1,13 @@
 // @vitest-environment jsdom
-import { test, afterEach, expect } from 'vitest'
+import { test, afterEach, expect, vi } from 'vitest'
 import assert from 'node:assert/strict'
 import { useState } from 'react'
 import { render, screen, fireEvent, cleanup, act } from '@testing-library/react'
 import { Practice } from './Practice'
+import { SESSION_CAP } from '@/lib/session/goal'
+import { answerCorrectly, answerWrongly, clearFeedback, comparePrompt, numericPrompt, paragraphs } from './testing/answering'
 import { emptyProgress, record, type Progress } from '@/lib/mastery/mastery'
+import type { Difficulty } from '@/lib/curriculum/types'
 import type { ImplementedSkill } from '@/lib/problems'
 
 afterEach(cleanup)
@@ -16,71 +19,33 @@ afterEach(cleanup)
  *
  * The seed is fixed so a session is identical on every run.
  */
-function Harness({ skill = 'a-add-within-10' as ImplementedSkill, seed = 4242 }) {
+function Harness({
+  skill = 'a-add-within-10' as ImplementedSkill,
+  seed = 4242,
+  profileName,
+  onSwitchProfile,
+}: {
+  skill?: ImplementedSkill
+  seed?: number
+  profileName?: string
+  onSwitchProfile?: () => void
+}) {
   const [progress, setProgress] = useState<Progress>(() => ({
     ...emptyProgress(),
     placed: ['n-bonds-10', 'a-add-within-10', 'a-sub-within-10', 'a-add-within-20'],
     placementDone: true,
   }))
   return (
-    <Practice skill={skill} progress={progress} onProgress={setProgress} onLeave={() => {}} seed={seed} />
+    <Practice
+      skill={skill}
+      progress={progress}
+      onProgress={setProgress}
+      onLeave={() => {}}
+      profileName={profileName}
+      onSwitchProfile={onSwitchProfile}
+      seed={seed}
+    />
   )
-}
-
-// ---- reading and answering whatever is on screen --------------------------
-// Sessions interleave, so a session anchored on one skill still shows others.
-// These helpers cope with both input modes: the numeric keypad, and the three
-// buttons the comparison skill uses.
-
-const paragraphs = () => [...document.querySelectorAll('p')].map((p) => (p.textContent ?? '').trim())
-
-/** The comparison prompt, when that is what is on screen. */
-const comparePrompt = () => paragraphs().find((t) => /^\d+ \? \d+$/.test(t))
-
-const numericPrompt = () => paragraphs().find((t) =>
-  /^\d+\s*[+−]\s*\d+$/.test(t) ||
-  /^\d+ \+ \? = 10$/.test(t) ||
-  /^Which digit is in the \w+ place\?/.test(t))
-
-function solve(prompt: string): number {
-  let m
-  if ((m = prompt.match(/^(\d+)\s*([+−])\s*(\d+)$/))) return m[2] === '+' ? +m[1] + +m[3] : +m[1] - +m[3]
-  if ((m = prompt.match(/^(\d+) \+ \? = 10$/))) return 10 - +m[1]
-  if ((m = prompt.match(/^Which digit is in the (\w+) place\?\s+(\d+)$/))) {
-    const n = m[2]
-    return +(m[1] === 'ones' ? n.slice(-1) : m[1] === 'tens' ? n.slice(-2, -1) : n.slice(-3, -2))
-  }
-  assert.fail(`cannot solve "${prompt}"`)
-}
-
-const type = (text: string) => { for (const ch of text) fireEvent.keyDown(window, { key: ch }) }
-
-/** Answer the current problem correctly, whichever input mode it uses. */
-function answerCorrectly(): void {
-  const compare = comparePrompt()
-  if (compare) {
-    const [, a, b] = compare.match(/^(\d+) \? (\d+)$/)!
-    fireEvent.click(screen.getByRole('button', { name: +a > +b ? '>' : +a < +b ? '<' : '=' }))
-    return
-  }
-  const prompt = numericPrompt()
-  assert.ok(prompt, `nothing answerable on screen:\n${document.body.textContent}`)
-  type(String(solve(prompt)))
-  fireEvent.keyDown(window, { key: 'Enter' })
-}
-
-/** Answer the current problem wrongly, whichever input mode it uses. */
-function answerWrongly(): void {
-  const compare = comparePrompt()
-  if (compare) {
-    const [, a, b] = compare.match(/^(\d+) \? (\d+)$/)!
-    fireEvent.click(screen.getByRole('button', { name: +a > +b ? '<' : '>' }))
-    return
-  }
-  const prompt = numericPrompt()
-  assert.ok(prompt, `nothing answerable on screen:\n${document.body.textContent}`)
-  type(String(solve(prompt) + 1))
-  fireEvent.keyDown(window, { key: 'Enter' })
 }
 
 const settle = () => act(async () => { await new Promise((r) => setTimeout(r, 900)) })
@@ -171,8 +136,8 @@ test('the whole session can be played to the summary screen', { timeout: 60_000 
 
   // Answered correctly throughout, so the score is a clean sweep.
   assert.match(document.body.textContent ?? '', /20\s*\/\s*20/)
-  expect(screen.getByRole('button', { name: /^Again$/ })).toBeTruthy()
-  expect(screen.getByRole('button', { name: /Choose another topic/ })).toBeTruthy()
+  expect(screen.getByRole('button', { name: /^Keep going$/ })).toBeTruthy()
+  expect(screen.getByRole('button', { name: /See how/ })).toBeTruthy()
 })
 
 /** Interleaving: a session anchored on one skill should still show others. */
@@ -219,33 +184,53 @@ function StruggleHarness({ onPick = () => {} }: { onPick?: (s: ImplementedSkill)
   )
 }
 
-test('the summary offers the gap underneath a skill being failed', { timeout: 60_000 }, async () => {
-  render(<StruggleHarness />)
-
-  // Play the session out, getting everything wrong.
-  for (let i = 0; i < 20; i++) {
-    type('0')
-    fireEvent.keyDown(window, { key: 'Enter' })
-    await act(async () => { await new Promise((r) => setTimeout(r, 1600)) })
+/**
+ * Play a whole session out, getting the topic in hand wrong every time.
+ *
+ * Two things this has to cope with. A session no longer has a fixed length —
+ * a run of wrong answers goes all the way to the cap — so waiting out the
+ * feedback for real would cost the cap times 1.5 seconds. And interleaved
+ * review brings in comparison questions, which are TAPPED rather than typed:
+ * a keypad-only loop jams on the first one, because its keys do not dismiss
+ * the feedback and the buttons underneath are disabled while it shows.
+ */
+async function failEverything() {
+  vi.useFakeTimers()
+  try {
+    for (let i = 0; i < SESSION_CAP; i++) {
+      if (screen.queryByRole('button', { name: /^Keep going$/ })) break // already finished
+      if (screen.queryByRole('button', { name: 'Submit' })) {
+        fireEvent.keyDown(window, { key: '0' })
+        fireEvent.keyDown(window, { key: 'Enter' })
+      } else {
+        fireEvent.click(screen.getAllByRole('button')[1]) // a choice: the first option
+      }
+      await act(async () => { await vi.advanceTimersByTimeAsync(FEEDBACK_MS) })
+    }
+  } finally {
+    vi.useRealTimers()
   }
+}
+
+/** Longer than the wrong-answer feedback, which is the slower of the two. */
+const FEEDBACK_MS = 1600
+
+test('the summary offers the gap underneath a skill being failed', { timeout: 30_000 }, async () => {
+  render(<StruggleHarness />)
+  await failEverything()
 
   // "Adding and subtracting negatives" is two levels below two-step equations.
   assert.match(document.body.textContent ?? '', /negatives/i,
     'a learner failing this needs the gap beneath it, not more of the same')
 })
 
-test('the suggestion can be declined', { timeout: 60_000 }, async () => {
+test('the suggestion can be declined', { timeout: 30_000 }, async () => {
   const picked: string[] = []
   render(<StruggleHarness onPick={(s) => picked.push(s)} />)
-
-  for (let i = 0; i < 20; i++) {
-    type('0')
-    fireEvent.keyDown(window, { key: 'Enter' })
-    await act(async () => { await new Promise((r) => setTimeout(r, 1600)) })
-  }
+  await failEverything()
 
   assert.equal(picked.length, 0, 'nothing should be forced on them')
-  expect(screen.getByRole('button', { name: /^Again$/ })).toBeTruthy()
+  expect(screen.getByRole('button', { name: /^Keep going$/ })).toBeTruthy()
 })
 
 // ---- making the mix legible ----------------------------------------------
@@ -324,6 +309,105 @@ test('the back link and Submit are reachable as real buttons', () => {
   render(<Harness />)
   // Native buttons are focusable and Enter-activatable; anything else would
   // need explicit key handling to be usable without a mouse.
-  const back = screen.getByRole('button', { name: /Back to the topic list|←/ })
+  const back = screen.getByRole('button', { name: /See how|←/ })
   assert.equal(back.tagName, 'BUTTON')
 })
+
+/**
+ * The app opens straight into a session now, so a sibling picking the device up
+ * lands mid-someone-else's topic. If they answer before noticing, it goes into
+ * the wrong journey — the exact mixing profiles exist to stop.
+ */
+test('whose session it is is on screen from the first question', () => {
+  render(<Harness skill="a-add-within-20" profileName="Eddie" onSwitchProfile={() => {}} />)
+  assert.match(document.body.textContent ?? '', /Eddie/,
+    'a sibling must be able to see whose journey they are about to practise into')
+})
+
+test('the device can be handed over at the end of a session', async () => {
+  const onSwitch = vi.fn()
+  render(<Harness skill="a-add-within-20" profileName="Eddie" onSwitchProfile={onSwitch} />)
+  await failEverything()
+
+  fireEvent.click(screen.getByRole('button', { name: /Switch to someone else/i }))
+  assert.equal(onSwitch.mock.calls.length, 1)
+})
+
+/**
+ * Being quietly given easier work is worse than being told. The whole mechanism
+ * depends on the child trusting it, and a silent change is indistinguishable
+ * from the app deciding they are not up to it.
+ */
+test('running out of questions says the next lot will be gentler', async () => {
+  render(<StruggleHarness />)
+  await failEverything()
+
+  const body = document.body.textContent ?? ''
+  assert.match(body, /enough for today/i, 'the cap is stated as a stopping point, not a failure')
+  assert.match(body, /gentler/i, 'and the child is told what changes because of it')
+})
+
+test('nothing is claimed about a topic that has no easier version', async () => {
+  // Times tables have one band, so there is no gentler version to promise.
+  render(<Harness skill="m-times-6-7-8-9" />)
+  await failEverything()
+
+  assert.doesNotMatch(document.body.textContent ?? '', /gentler|harder/i,
+    'a promise the app cannot keep is worse than saying nothing')
+})
+
+/**
+ * The level has to reach the SCREEN, not just the generators.
+ *
+ * It did not, for three PRs: `startSession` never read the stored level, so a
+ * child told their next questions would be gentler got the identical ones. The
+ * session layer is covered by its own property test; this covers the last link,
+ * which is Practice handing the learner's own journey to the generator.
+ */
+test('the questions on screen are asked at the level that was stored', { timeout: 30_000 }, async () => {
+  const simple = await promptsFor('simple')
+  const hard = await promptsFor('difficult')
+
+  assert.ok(simple.length >= 3, `too few three-digit sums to judge: ${simple.length}`)
+  assert.ok(hard.length >= 3, `too few three-digit sums to judge: ${hard.length}`)
+
+  for (const p of simple) assert.equal(carries(p), false, `"${p}" carries — that is not the gentle version`)
+  for (const p of hard) assert.equal(carries(p), true, `"${p}" does not carry — that is not the hard version`)
+})
+
+/** Every three-digit sum a session on that topic puts on screen. */
+async function promptsFor(level: Difficulty): Promise<string[]> {
+  cleanup()
+  const progress: Progress = {
+    ...emptyProgress(),
+    placementDone: true,
+    placed: ['n-bonds-10', 'n-place-value-100', 'n-place-value-1000', 'a-add-within-10',
+      'a-add-within-20', 'a-add-2digit', 'a-add-2digit-regroup', 'a-add-3digit'],
+    levels: { 'a-add-3digit': level },
+  }
+  render(
+    <Practice skill="a-add-3digit" progress={progress} onProgress={() => {}}
+      onLeave={() => {}} seed={4242} />,
+  )
+
+  const seen = new Set<string>()
+  for (let i = 0; i < 18; i++) {
+    await clearFeedback()
+    for (const t of paragraphs()) if (/^\d{3} \+ \d{3}$/.test(t)) seen.add(t)
+    answerWrongly()
+    await act(async () => {})
+  }
+  return [...seen]
+}
+
+/** Does any column reach ten? That is what the levels move. */
+function carries(prompt: string): boolean {
+  const [a, b] = prompt.split(' + ').map(Number)
+  let carry = 0
+  for (let place = 1; place <= 100; place *= 10) {
+    const sum = (Math.floor(a / place) % 10) + (Math.floor(b / place) % 10) + carry
+    carry = sum >= 10 ? 1 : 0
+    if (carry) return true
+  }
+  return false
+}

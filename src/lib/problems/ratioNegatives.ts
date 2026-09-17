@@ -1,6 +1,7 @@
-import type { Generator, Rng } from '@/lib/curriculum/types'
+import type { Difficulty, Generator, Rng } from '@/lib/curriculum/types'
 import { pick, pickFrom, until } from './rng'
-import { choice, int, problem } from './build'
+import { band, pickBand, pickFromBand, rangeBand } from './difficulty'
+import { choice, int, numeral, problem } from './build'
 import { gcd, simplify } from './fraction'
 
 const PRIMES_TO_100 = [2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47,
@@ -25,11 +26,20 @@ export const rSquares: Generator = (rng: Rng) => {
  * positive, so a child at this stage never meets a fraction or a negative they
  * have not been taught yet — those are separate skills further along the graph.
  */
-export const rOrderOfOps: Generator = (rng: Rng) => {
-  const shape = pickFrom(rng, ['a+b*c', 'a*b+c', 'a*b-c', '(a+b)*c'] as const)
-  const a = pick(rng, 2, 9)
-  const b = pick(rng, 2, 9)
-  const c = pick(rng, 2, 9)
+export const rOrderOfOps: Generator = (rng: Rng, level: Difficulty = 'medium') => {
+  // Simple omits the bracketed shape and the subtraction: the point at that
+  // level is only that multiplication goes first.
+  const shape = pickFromBand(
+    rng,
+    level,
+    ['a+b*c', 'a*b+c'] as const,
+    ['a+b*c', 'a*b+c', 'a*b-c', '(a+b)*c'] as const,
+    ['a*b-c', '(a+b)*c', 'a+b*c'] as const,
+  )
+  const [lo, hi] = rangeBand(level, [2, 5], [2, 9], [6, 12])
+  const a = pick(rng, lo, hi)
+  const b = pick(rng, lo, hi)
+  const c = pick(rng, lo, hi)
   switch (shape) {
     case 'a+b*c':
       return problem('r-order-of-ops', `${a} + ${b} × ${c}`, int(a + b * c), [a, b, c])
@@ -42,22 +52,24 @@ export const rOrderOfOps: Generator = (rng: Rng) => {
   }
 }
 
-export const rNegativeAddSub: Generator = (rng: Rng) => {
-  const a = pick(rng, -20, -1)
-  const b = pick(rng, 1, 20)
+export const rNegativeAddSub: Generator = (rng: Rng, level: Difficulty = 'medium') => {
+  const [lo, hi] = rangeBand(level, [1, 9], [1, 20], [12, 50])
+  const a = -pick(rng, lo, hi)
+  const b = pick(rng, lo, hi)
   const subtract = rng() < 0.5
   return subtract
-    ? problem('r-negative-add-sub', `${a} − ${b}`, int(a - b), [a, b])
-    : problem('r-negative-add-sub', `${a} + ${b}`, int(a + b), [a, b])
+    ? problem('r-negative-add-sub', `${numeral(a)} − ${b}`, int(a - b), [a, b])
+    : problem('r-negative-add-sub', `${numeral(a)} + ${b}`, int(a + b), [a, b])
 }
 
 /** Division is generated backwards so it stays exact. */
-export const rNegativeMulDiv: Generator = (rng: Rng) => {
-  const a = pick(rng, 2, 12) * (rng() < 0.5 ? -1 : 1)
-  const b = pick(rng, 2, 12) * (rng() < 0.5 ? -1 : 1)
+export const rNegativeMulDiv: Generator = (rng: Rng, level: Difficulty = 'medium') => {
+  const [lo, hi] = rangeBand(level, [2, 5], [2, 12], [6, 12])
+  const a = pick(rng, lo, hi) * (rng() < 0.5 ? -1 : 1)
+  const b = pick(rng, lo, hi) * (rng() < 0.5 ? -1 : 1)
   return rng() < 0.5
-    ? problem('r-negative-mul-div', `${a} × ${b}`, int(a * b), [a, b])
-    : problem('r-negative-mul-div', `${a * b} ÷ ${a}`, int(b), [a * b, a])
+    ? problem('r-negative-mul-div', `${numeral(a)} × ${numeral(b)}`, int(a * b), [a, b])
+    : problem('r-negative-mul-div', `${numeral(a * b)} ÷ ${numeral(a)}`, int(b), [a * b, a])
 }
 
 /**
@@ -65,10 +77,10 @@ export const rNegativeMulDiv: Generator = (rng: Rng) => {
  * non-integer scale factor is a harder skill and belongs to the fractions
  * strand, not here.
  */
-export const rProportion: Generator = (rng: Rng) => {
-  const unit = pick(rng, 2, 12)
-  const n1 = pick(rng, 2, 6)
-  const n2 = pick(rng, 2, 9)
+export const rProportion: Generator = (rng: Rng, level: Difficulty = 'medium') => {
+  const unit = pickBand(rng, level, [2, 5], [2, 12], [7, 15])
+  const n1 = pickBand(rng, level, [2, 4], [2, 6], [4, 9])
+  const n2 = pickBand(rng, level, [2, 6], [2, 9], [7, 15])
   return problem(
     'r-proportion',
     `If ${n1} pencils cost ${n1 * unit}p, what do ${n2} pencils cost?`,
@@ -85,12 +97,13 @@ export const rProportion: Generator = (rng: Rng) => {
  * equivalent-unsimplified rather than wrong, exactly as an unsimplified
  * fraction does; see docs/design.md.
  */
-export const rRatioSimplify: Generator = (rng: Rng) => {
+export const rRatioSimplify: Generator = (rng: Rng, level: Difficulty = 'medium') => {
+  const [lo, hi] = rangeBand(level, [1, 5], [1, 9], [3, 9])
   const base = until(
-    () => ({ a: pick(rng, 1, 9), b: pick(rng, 1, 9) }),
+    () => ({ a: pick(rng, lo, hi), b: pick(rng, lo, hi) }),
     ({ a, b }) => gcd(a, b) === 1 && a !== b,
   )
-  const factor = pick(rng, 2, 6)
+  const factor = pickBand(rng, level, [2, 3], [2, 6], [4, 9])
   const reduced = simplify(base.a, base.b)
   return problem(
     'r-ratio-simplify',
@@ -109,15 +122,17 @@ export const rRatioSimplify: Generator = (rng: Rng) => {
  * does, and they are precisely what adding fractions with unlike denominators
  * depends on.
  */
-export const rFactorsMultiples: Generator = (rng: Rng) => {
+export const rFactorsMultiples: Generator = (rng: Rng, level: Difficulty = 'medium') => {
   const wantHighest = rng() < 0.5
 
   // A shared factor by construction, so "highest common factor" is never a
   // pointless 1, and the multiple stays small enough to work out mentally.
-  const shared = pick(rng, 2, 9)
+  const shared = pickBand(rng, level, [2, 4], [2, 9], [5, 12])
+  const [lo, hi] = rangeBand(level, [2, 5], [2, 9], [4, 12])
+  const limit = band(level, 120, 400, 900)
   const { x, y } = until(
-    () => ({ x: shared * pick(rng, 2, 9), y: shared * pick(rng, 2, 9) }),
-    ({ x, y }) => x !== y && (x * y) / gcd(x, y) <= 400,
+    () => ({ x: shared * pick(rng, lo, hi), y: shared * pick(rng, lo, hi) }),
+    ({ x, y }) => x !== y && (x * y) / gcd(x, y) <= limit,
   )
 
   return wantHighest

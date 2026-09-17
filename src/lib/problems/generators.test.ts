@@ -1,6 +1,7 @@
 import { test } from 'vitest'
 import assert from 'node:assert/strict'
 import { GENERATORS, IMPLEMENTED, generate, seeded } from './index'
+import { numeral } from './build'
 import { check } from './check'
 import { SKILL_BY_ID } from '../curriculum/skills'
 import type { ImplementedSkill } from './index'
@@ -165,7 +166,10 @@ test('equations solve to the stated answer', () => {
   for (const p of sample('p-solve-two-step')) {
     const [a, b, x] = p.operands
     assert.ok(p.answer.kind === 'integer' && p.answer.value === x)
-    assert.ok(p.prompt.includes(`= ${a * x + b}`), `p-solve-two-step: ${p.prompt} does not balance`)
+    // `numeral`, not a bare interpolation: the prompt writes a negative
+    // right-hand side with a typographic minus, as every other sign in it is.
+    assert.ok(p.prompt.includes(`= ${numeral(a * x + b)}`),
+      `p-solve-two-step: ${p.prompt} does not balance`)
   }
   for (const p of sample('p-solve-both-sides')) {
     const [a1, b1, a2, b2] = p.operands
