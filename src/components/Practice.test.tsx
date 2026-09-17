@@ -5,8 +5,9 @@ import { useState } from 'react'
 import { render, screen, fireEvent, cleanup, act } from '@testing-library/react'
 import { Practice } from './Practice'
 import { SESSION_CAP } from '@/lib/session/goal'
-import { answerCorrectly, answerWrongly, comparePrompt, numericPrompt } from './testing/answering'
+import { answerCorrectly, answerWrongly, clearFeedback, comparePrompt, numericPrompt, paragraphs } from './testing/answering'
 import { emptyProgress, record, type Progress } from '@/lib/mastery/mastery'
+import type { Difficulty } from '@/lib/curriculum/types'
 import type { ImplementedSkill } from '@/lib/problems'
 
 afterEach(cleanup)
@@ -354,3 +355,59 @@ test('nothing is claimed about a topic that has no easier version', async () => 
   assert.doesNotMatch(document.body.textContent ?? '', /gentler|harder/i,
     'a promise the app cannot keep is worse than saying nothing')
 })
+
+/**
+ * The level has to reach the SCREEN, not just the generators.
+ *
+ * It did not, for three PRs: `startSession` never read the stored level, so a
+ * child told their next questions would be gentler got the identical ones. The
+ * session layer is covered by its own property test; this covers the last link,
+ * which is Practice handing the learner's own journey to the generator.
+ */
+test('the questions on screen are asked at the level that was stored', { timeout: 30_000 }, async () => {
+  const simple = await promptsFor('simple')
+  const hard = await promptsFor('difficult')
+
+  assert.ok(simple.length >= 3, `too few three-digit sums to judge: ${simple.length}`)
+  assert.ok(hard.length >= 3, `too few three-digit sums to judge: ${hard.length}`)
+
+  for (const p of simple) assert.equal(carries(p), false, `"${p}" carries — that is not the gentle version`)
+  for (const p of hard) assert.equal(carries(p), true, `"${p}" does not carry — that is not the hard version`)
+})
+
+/** Every three-digit sum a session on that topic puts on screen. */
+async function promptsFor(level: Difficulty): Promise<string[]> {
+  cleanup()
+  const progress: Progress = {
+    ...emptyProgress(),
+    placementDone: true,
+    placed: ['n-bonds-10', 'n-place-value-100', 'n-place-value-1000', 'a-add-within-10',
+      'a-add-within-20', 'a-add-2digit', 'a-add-2digit-regroup', 'a-add-3digit'],
+    levels: { 'a-add-3digit': level },
+  }
+  render(
+    <Practice skill="a-add-3digit" progress={progress} onProgress={() => {}}
+      onLeave={() => {}} seed={4242} />,
+  )
+
+  const seen = new Set<string>()
+  for (let i = 0; i < 18; i++) {
+    await clearFeedback()
+    for (const t of paragraphs()) if (/^\d{3} \+ \d{3}$/.test(t)) seen.add(t)
+    answerWrongly()
+    await act(async () => {})
+  }
+  return [...seen]
+}
+
+/** Does any column reach ten? That is what the levels move. */
+function carries(prompt: string): boolean {
+  const [a, b] = prompt.split(' + ').map(Number)
+  let carry = 0
+  for (let place = 1; place <= 100; place *= 10) {
+    const sum = (Math.floor(a / place) % 10) + (Math.floor(b / place) % 10) + carry
+    carry = sum >= 10 ? 1 : 0
+    if (carry) return true
+  }
+  return false
+}

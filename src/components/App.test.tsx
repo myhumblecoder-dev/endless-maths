@@ -3,7 +3,7 @@ import { test, afterEach, beforeEach, expect } from 'vitest'
 import assert from 'node:assert/strict'
 import { render, screen, fireEvent, cleanup, act, waitFor } from '@testing-library/react'
 import { App } from './App'
-import { answerCorrectly } from './testing/answering'
+import { answerCorrectly, clearFeedback } from './testing/answering'
 
 
 beforeEach(() => localStorage.clear())
@@ -336,22 +336,3 @@ async function playUntilOver(minimum: number) {
   assert.fail('the session never ended')
 }
 
-/**
- * Get the outcome of the last answer off the screen before reading the next
- * question, because while it shows, the prompt is still the one just answered —
- * reading first meant solving the previous question and submitting it against
- * the next one, so a "clean" run was nothing of the sort.
- *
- * Typed answers dismiss it with a keystroke, which the app supports on purpose.
- * Tapped ones — the comparison questions — have to be waited out, because their
- * keys do not dismiss it and the buttons underneath are disabled while it shows.
- */
-async function clearFeedback() {
-  if (screen.queryByRole('button', { name: 'Submit' })) {
-    fireEvent.keyDown(window, { key: '0' })
-    fireEvent.keyDown(window, { key: 'Backspace' })
-    await act(async () => {})
-  } else {
-    await act(async () => { await new Promise((r) => setTimeout(r, 1600)) })
-  }
-}

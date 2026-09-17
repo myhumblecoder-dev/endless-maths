@@ -12,7 +12,7 @@
  */
 
 import assert from 'node:assert/strict'
-import { screen, fireEvent } from '@testing-library/react'
+import { screen, fireEvent, act } from '@testing-library/react'
 
 export const paragraphs = (): string[] =>
   [...document.querySelectorAll('p')].map((p) => (p.textContent ?? '').trim())
@@ -52,6 +52,30 @@ export function solve(prompt: string): number {
 
 export const type = (text: string): void => {
   for (const ch of text) fireEvent.keyDown(window, { key: ch })
+}
+
+/**
+ * Get the outcome of the last answer off the screen, before reading the next
+ * question.
+ *
+ * While feedback shows, the prompt on screen is still the one just answered, so
+ * reading first means solving the previous question and submitting it against
+ * the next one — a "clean" run that is nothing of the sort.
+ *
+ * Typed answers dismiss it with a keystroke, which the app supports on purpose
+ * and which costs nothing. Tapped ones — the comparison questions — have to be
+ * waited out, because their keys do not dismiss it and the buttons underneath
+ * are disabled while it shows. Waiting out EVERY question instead turns a
+ * three-second test into a minute-long one.
+ */
+export async function clearFeedback(): Promise<void> {
+  if (screen.queryByRole('button', { name: 'Submit' })) {
+    fireEvent.keyDown(window, { key: '0' })
+    fireEvent.keyDown(window, { key: 'Backspace' })
+    await act(async () => {})
+  } else {
+    await act(async () => { await new Promise((r) => setTimeout(r, 1600)) })
+  }
 }
 
 /** Answer the current problem correctly, whichever input mode it uses. */
