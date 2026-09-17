@@ -150,16 +150,7 @@ export function SkillMap({
                     : ''
 
                   return (
-                    <li
-                      key={skill.id}
-                      // The row carries the label, because the row is the thing
-                      // now — there is no button to hang it on any more, and a
-                      // lock reason in grey text alone is not a channel every
-                      // reader has.
-                      aria-label={
-                        `${skill.label}${figures ? `. ${figures}` : ''}${open ? '' : ` (locked. ${reason})`}`
-                      }
-                    >
+                    <li key={skill.id}>
                       <div
                         className={`flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-lg
                           ${open
@@ -171,6 +162,16 @@ export function SkillMap({
                         </span>
                         <span className="flex-1">
                           {skill.label}
+                          {/*
+                            In the row's own text rather than an aria-label on
+                            it. The reason used to be a button's accessible
+                            name, which is announced reliably; on a plain list
+                            item an aria-label often is not, and several readers
+                            announce the contents instead — which would have
+                            left a screen-reader user with no spoken channel for
+                            the lock at all. The greyed-out look is not one.
+                          */}
+                          {!open && <span className="sr-only">. locked. </span>}
                           {reason && (
                             <span className="mt-0.5 block text-xs text-slate-400 dark:text-slate-600">
                               {reason}

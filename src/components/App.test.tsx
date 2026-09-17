@@ -3,6 +3,7 @@ import { test, afterEach, beforeEach, expect } from 'vitest'
 import assert from 'node:assert/strict'
 import { render, screen, fireEvent, cleanup, act, waitFor } from '@testing-library/react'
 import { App } from './App'
+import { answerCorrectly } from './testing/answering'
 
 
 beforeEach(() => localStorage.clear())
@@ -136,9 +137,19 @@ test('adding someone takes them straight into the level check', async () => {
   assert.match(document.body.textContent ?? '', /find your level/i)
 })
 
-/** In a session, which is where the app now opens. */
+/**
+ * In a session — answering questions, not looking at a summary.
+ *
+ * Both screens carry a "See how I'm doing" button, so matching on that alone
+ * said yes to the summary screen too, and hid a dead "Keep going" button behind
+ * a passing assertion.
+ */
 const atPractice = () =>
-  waitFor(() => expect(screen.getByRole('button', { name: /See how/i })).toBeTruthy())
+  waitFor(() => {
+    assert.equal(screen.queryByRole('button', { name: /^Keep going$/ }), null,
+      'still on the summary screen')
+    assert.match(document.body.textContent ?? '', /\d+ \/ \d+/, 'no question counter')
+  })
 
 /** The map is a progress view now, one tap from whatever they are doing. */
 async function goToProgress() {
@@ -216,10 +227,11 @@ test('the topic stays put while a session is being answered', async () => {
 
 /** The label in the back link, which names the topic in hand. */
 const topicOnScreen = () =>
-  screen.getByRole('button', { name: /See how/i }).textContent?.replace('←', '').trim()
+  screen.getAllByRole('button')
+    .find((b) => b.textContent?.startsWith('←'))?.textContent?.replace('←', '').trim()
 
-/** A learner part way through, weak at one topic and placed through to it. */
-function seedJourney() {
+/** A learner well behind on one topic, placed through to it. */
+function seedJourney(override: Record<string, unknown> = {}) {
   const id = 'p_seed'
   localStorage.setItem(PROFILES_KEY, JSON.stringify({
     profiles: [{ id, name: 'Eddie' }], activeId: id,
@@ -228,14 +240,85 @@ function seedJourney() {
     facts: {},
     skills: {
       'a-add-3digit': {
-        skill: 'a-add-3digit', attempts: 14,
-        recent: [false, true, false, false, true, false, true, false, false, false],
+        skill: 'a-add-3digit',
+        attempts: 30,
+        recent: [false, false, false, false, false, false, false, false, false, false],
         lastSeenAt: 0,
       },
     },
-    placed: ['n-bonds-10', 'n-compare-20', 'n-place-value-100', 'n-place-value-1000', 'n-round',
-      'a-add-within-10', 'a-sub-within-10', 'a-add-within-20', 'a-sub-within-20',
-      'a-add-2digit', 'a-add-2digit-regroup', 'a-sub-2digit', 'a-sub-2digit-regroup', 'a-add-3digit'],
+    placed: ['n-bonds-10', 'n-place-value-100', 'n-place-value-1000',
+      'a-add-within-10', 'a-add-within-20', 'a-add-2digit', 'a-add-2digit-regroup', 'a-add-3digit'],
     placementDone: true,
+    ...override,
   }))
+}
+
+/**
+ * "Keep going" has to start a session even when the topic is unchanged — which
+ * is the COMMON case, because a topic stays their weakest until they beat it.
+ *
+ * It was wired to re-pick the topic, and re-picking the same skill changed no
+ * prop that Practice watches, so nothing happened at all: the child finished,
+ * tapped the button, and sat there.
+ */
+test('keep going starts a new session even on the same topic', { timeout: 60_000 }, async () => {
+  // Well enough behind that one short session cannot rescue the topic, so it is
+  // still the weakest afterwards. That is the case the button was broken in.
+  seedJourney({ sessionLength: 10 })
+  render(<App />)
+  await settle()
+  await atPractice()
+
+  const topic = topicOnScreen()
+  await playUntilOver(10)
+
+  expect(screen.getByRole('button', { name: /^Keep going$/ })).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: /^Keep going$/ }))
+  await settle()
+
+  await atPractice()
+  assert.equal(topicOnScreen(), topic, 'the same topic, as expected')
+  assert.match(document.body.textContent ?? '', /1 \/ 10/, 'and a session that has actually begun')
+})
+
+/**
+ * Play a session out correctly until it ends.
+ *
+ * Deliberately short: a full sixty-question failed session through the whole
+ * App tree runs the test worker out of memory, and it is not what this is
+ * about — the topic staying put is arranged by the seed instead.
+ *
+ * Waits out the feedback rather than typing through it, because the prompt on
+ * screen is still the question just answered while it shows. Reading first
+ * meant solving the previous question and submitting it against the next one.
+ */
+async function playUntilOver(minimum: number) {
+  for (let i = 0; i < 3 * minimum; i++) {
+    if (screen.queryByRole('button', { name: /^Keep going$/ })) return
+    await clearFeedback()
+    if (screen.queryByRole('button', { name: /^Keep going$/ })) return
+    answerCorrectly()
+    await act(async () => {})
+  }
+  assert.fail('the session never ended')
+}
+
+/**
+ * Get the outcome of the last answer off the screen before reading the next
+ * question, because while it shows, the prompt is still the one just answered —
+ * reading first meant solving the previous question and submitting it against
+ * the next one, so a "clean" run was nothing of the sort.
+ *
+ * Typed answers dismiss it with a keystroke, which the app supports on purpose.
+ * Tapped ones — the comparison questions — have to be waited out, because their
+ * keys do not dismiss it and the buttons underneath are disabled while it shows.
+ */
+async function clearFeedback() {
+  if (screen.queryByRole('button', { name: 'Submit' })) {
+    fireEvent.keyDown(window, { key: '0' })
+    fireEvent.keyDown(window, { key: 'Backspace' })
+    await act(async () => {})
+  } else {
+    await act(async () => { await new Promise((r) => setTimeout(r, 1600)) })
+  }
 }

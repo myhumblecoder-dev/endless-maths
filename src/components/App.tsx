@@ -79,6 +79,15 @@ export function App() {
    * once pinned the counter at 1 / 20.
    */
   const [topic, setTopic] = useState<Pick | null>(null)
+  /**
+   * Which run of practice this is.
+   *
+   * Only used as Practice's `key`, and that is the whole point: "Keep going"
+   * re-picks the topic, and a topic stays weakest until it is beaten — so the
+   * common case is picking the SAME skill, which changed no prop Practice
+   * watches. The session stayed finished and the button did nothing at all.
+   */
+  const [run, setRun] = useState(0)
   const [showingProgress, setShowingProgress] = useState(false)
   const [showingResult, setShowingResult] = useState(false)
   /** Stamped when the map is shown, not read during render. */
@@ -126,12 +135,19 @@ export function App() {
     setProfiles(next)
   }, [])
 
-  /** Start the next session on whatever is weakest NOW, not when they sat down. */
-  const nextTopic = useCallback((from: Progress) => {
-    setTopic(pickTopic(from))
+  /** Begin a run of practice on this topic. */
+  const startRun = useCallback((next: Pick) => {
+    setTopic(next)
+    setRun((n) => n + 1)
     setShowingProgress(false)
     setNow(Date.now())
   }, [])
+
+  /** Start the next session on whatever is weakest NOW, not when they sat down. */
+  const nextTopic = useCallback(
+    (from: Progress) => startRun(pickTopic(from)),
+    [startRun],
+  )
 
   if (!profiles) {
     return <main className="grid min-h-dvh place-items-center text-slate-400">Loading…</main>
@@ -193,11 +209,20 @@ export function App() {
   }
 
   if (showingProgress) {
+    /**
+     * Picked ONCE, and used for both the name and the button.
+     *
+     * Showing the frozen topic from before the session while the button
+     * re-picked from the progress after it meant the map could say "Rounding"
+     * and then start something else — being moved around without being told
+     * why, which is the thing this callout exists to prevent.
+     */
+    const upNext = pickTopic(progress)
     return (
       <SkillMap
         progress={progress}
-        upNext={topic ?? pickTopic(progress)}
-        onBack={() => nextTopic(progress)}
+        upNext={upNext}
+        onBack={() => startRun(upNext)}
         onRetakePlacement={() => persist({ ...progress, placed: [], placementDone: false })}
         onSessionLength={(sessionLength) => persist({ ...progress, sessionLength })}
         onSwitchProfile={() => persistProfiles({ ...profiles, activeId: null })}
@@ -215,13 +240,15 @@ export function App() {
 
   return (
     <Practice
+      // A new run is a new session, even when it is the same topic.
+      key={run}
       skill={topic.skill}
       reason={topic.reason}
       progress={progress}
       onProgress={persist}
       onNext={() => nextTopic(progress)}
       onLeave={() => { setNow(Date.now()); setShowingProgress(true) }}
-      onPickSkill={(skill: ImplementedSkill) => setTopic({ skill, reason: 'foundation' })}
+      onPickSkill={(skill: ImplementedSkill) => startRun({ skill, reason: 'foundation' })}
       profileName={profiles.profiles.find((p) => p.id === activeId)?.name}
       onSwitchProfile={() => persistProfiles({ ...profiles, activeId: null })}
     />

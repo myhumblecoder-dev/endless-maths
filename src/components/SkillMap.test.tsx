@@ -10,6 +10,21 @@ afterEach(cleanup)
 
 const UP_NEXT: Pick = { skill: 'n-bonds-10', reason: 'new' }
 
+/**
+ * A row of the map, found by its text.
+ *
+ * Not by accessible name: a `listitem` does not take its name from its
+ * contents, and an `aria-label` on one is announced inconsistently — which is
+ * why everything a reader needs is in the row's own text instead.
+ */
+function mapRow(label: string): HTMLElement {
+  // Past the status glyph, which is decorative but still in the text.
+  const found = screen.getAllByRole('listitem')
+    .find((li) => (li.textContent ?? '').replace(/^[✓●○\s]+/, '').startsWith(label))
+  assert.ok(found, `no row for "${label}"`)
+  return found
+}
+
 const placed = (...skills: string[]): Progress => ({
   ...emptyProgress(),
   placed: skills as Progress['placed'],
@@ -34,7 +49,7 @@ test('no topic on the map is tappable', () => {
 
 test('locked topics are still shown, so what is coming stays visible', () => {
   render(<SkillMap progress={placed()} upNext={UP_NEXT} onBack={() => {}} onRetakePlacement={() => {}} now={0} />)
-  expect(screen.getByRole('listitem', { name: /^Two-step equations \(locked/ })).toBeTruthy()
+  assert.match(mapRow('Two-step equations').textContent ?? '', /locked/)
 })
 
 /** Being moved around by an app that will not say why is what grates. */
@@ -56,7 +71,7 @@ test('the next topic is the way back to practice', () => {
 
 test('mastered skills are marked done', () => {
   render(<SkillMap progress={placed('n-bonds-10')} upNext={UP_NEXT} onBack={() => {}} onRetakePlacement={() => {}} now={0} />)
-  const bonds = screen.getByRole('listitem', { name: /^Number bonds to 10/ })
+  const bonds = mapRow('Number bonds to 10')
   assert.match(bonds.textContent ?? '', /done/)
 })
 
@@ -98,7 +113,7 @@ test('a skill with facts due says so', () => {
     given: '30', verdict: 'incorrect', elapsedMs: 4000, at: 0,
   })
   render(<SkillMap progress={p} upNext={UP_NEXT} onBack={() => {}} onRetakePlacement={() => {}} now={60 * 60 * 1000} />)
-  const row = screen.getByRole('listitem', { name: /^The 2, 5 and 10 times tables/ })
+  const row = mapRow('The 2, 5 and 10 times tables')
   assert.match(row.textContent ?? '', /1 to review/i, 'due work should be visible before starting')
 })
 
@@ -107,21 +122,22 @@ test('a skill with facts due says so', () => {
 test('a locked topic says what would unlock it', () => {
   render(<SkillMap progress={placed()} upNext={UP_NEXT} onBack={() => {}} onRetakePlacement={() => {}} now={0} />)
 
-  const row = screen.getByRole('listitem', { name: /^Adding to 10/ })
+  const row = mapRow('Adding to 10')
   assert.match(row.textContent ?? '', /Number bonds to 10/,
     'a lock with no reason reads as the app being arbitrary')
 })
 
-test('the reason is part of the accessible name, not just colour', () => {
+/** Greyed-out text is not a channel every reader has. */
+test('the reason is in the row itself, not carried by colour alone', () => {
   render(<SkillMap progress={placed()} upNext={UP_NEXT} onBack={() => {}} onRetakePlacement={() => {}} now={0} />)
-  // Screen readers and greyed text are not the same channel.
-  expect(screen.getByRole('listitem', { name: /^Adding to 10.*Number bonds to 10/ })).toBeTruthy()
+  // Greyed-out text is not a channel every reader has.
+  assert.match(mapRow('Adding to 10').textContent ?? '', /Number bonds to 10/)
 })
 
 test('only the next step is named, not the whole chain', () => {
   render(<SkillMap progress={placed()} upNext={UP_NEXT} onBack={() => {}} onRetakePlacement={() => {}} now={0} />)
 
-  const row = screen.getByRole('listitem', { name: /^Two-step equations/ })
+  const row = mapRow('Two-step equations')
   assert.match(row.textContent ?? '', /One-step equations|negatives/i)
   assert.doesNotMatch(row.textContent ?? '', /Number bonds/,
     'the far end of the chain is true but useless')
@@ -130,7 +146,7 @@ test('only the next step is named, not the whole chain', () => {
 test('an unlocked topic says nothing extra', () => {
   render(<SkillMap progress={placed()} upNext={UP_NEXT} onBack={() => {}} onRetakePlacement={() => {}} now={0} />)
 
-  const row = screen.getByRole('listitem', { name: /^Number bonds to 10/ })
+  const row = mapRow('Number bonds to 10')
   assert.doesNotMatch(row.textContent ?? '', /after|needs/i)
 })
 
@@ -152,13 +168,13 @@ test('a practised topic shows how it is going', () => {
   const p = practised('n-bonds-10', [true, true, true, true, false])
   render(<SkillMap progress={p} upNext={UP_NEXT} onBack={() => {}} onRetakePlacement={() => {}} now={0} />)
 
-  const row = screen.getByRole('listitem', { name: /^Number bonds to 10/ })
+  const row = mapRow('Number bonds to 10')
   assert.match(row.textContent ?? '', /80%/, 'a binary tick is thin for an 11-year-old')
 })
 
 test('an unpractised topic shows no figures', () => {
   render(<SkillMap progress={placed()} upNext={UP_NEXT} onBack={() => {}} onRetakePlacement={() => {}} now={0} />)
-  const row = screen.getByRole('listitem', { name: /^Number bonds to 10/ })
+  const row = mapRow('Number bonds to 10')
   assert.doesNotMatch(row.textContent ?? '', /%/)
 })
 
@@ -167,7 +183,7 @@ test('a trend is shown once there is enough to go on', () => {
     [false, false, false, false, false, true, true, true, true, true])
   render(<SkillMap progress={p} upNext={UP_NEXT} onBack={() => {}} onRetakePlacement={() => {}} now={0} />)
 
-  const row = screen.getByRole('listitem', { name: /^Number bonds to 10/ })
+  const row = mapRow('Number bonds to 10')
   assert.match(row.textContent ?? '', /improving/i)
 })
 
@@ -184,7 +200,7 @@ test('the figures are factual, not praise or blame', () => {
 test('accuracy is in the accessible name too', () => {
   const p = practised('n-bonds-10', [true, true, true, true, false])
   render(<SkillMap progress={p} upNext={UP_NEXT} onBack={() => {}} onRetakePlacement={() => {}} now={0} />)
-  expect(screen.getByRole('listitem', { name: /^Number bonds to 10.*80%/ })).toBeTruthy()
+  assert.match(mapRow('Number bonds to 10').textContent ?? '', /80%/)
 })
 
 // ---- session length -------------------------------------------------------

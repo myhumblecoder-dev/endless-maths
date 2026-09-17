@@ -5,6 +5,7 @@ import { useState } from 'react'
 import { render, screen, fireEvent, cleanup, act } from '@testing-library/react'
 import { Practice } from './Practice'
 import { SESSION_CAP } from '@/lib/session/goal'
+import { answerCorrectly, answerWrongly, comparePrompt, numericPrompt } from './testing/answering'
 import { emptyProgress, record, type Progress } from '@/lib/mastery/mastery'
 import type { ImplementedSkill } from '@/lib/problems'
 
@@ -44,62 +45,6 @@ function Harness({
       seed={seed}
     />
   )
-}
-
-// ---- reading and answering whatever is on screen --------------------------
-// Sessions interleave, so a session anchored on one skill still shows others.
-// These helpers cope with both input modes: the numeric keypad, and the three
-// buttons the comparison skill uses.
-
-const paragraphs = () => [...document.querySelectorAll('p')].map((p) => (p.textContent ?? '').trim())
-
-/** The comparison prompt, when that is what is on screen. */
-const comparePrompt = () => paragraphs().find((t) => /^\d+ \? \d+$/.test(t))
-
-const numericPrompt = () => paragraphs().find((t) =>
-  /^\d+\s*[+−]\s*\d+$/.test(t) ||
-  /^\d+ \+ \? = 10$/.test(t) ||
-  /^Which digit is in the \w+ place\?/.test(t))
-
-function solve(prompt: string): number {
-  let m
-  if ((m = prompt.match(/^(\d+)\s*([+−])\s*(\d+)$/))) return m[2] === '+' ? +m[1] + +m[3] : +m[1] - +m[3]
-  if ((m = prompt.match(/^(\d+) \+ \? = 10$/))) return 10 - +m[1]
-  if ((m = prompt.match(/^Which digit is in the (\w+) place\?\s+(\d+)$/))) {
-    const n = m[2]
-    return +(m[1] === 'ones' ? n.slice(-1) : m[1] === 'tens' ? n.slice(-2, -1) : n.slice(-3, -2))
-  }
-  assert.fail(`cannot solve "${prompt}"`)
-}
-
-const type = (text: string) => { for (const ch of text) fireEvent.keyDown(window, { key: ch }) }
-
-/** Answer the current problem correctly, whichever input mode it uses. */
-function answerCorrectly(): void {
-  const compare = comparePrompt()
-  if (compare) {
-    const [, a, b] = compare.match(/^(\d+) \? (\d+)$/)!
-    fireEvent.click(screen.getByRole('button', { name: +a > +b ? '>' : +a < +b ? '<' : '=' }))
-    return
-  }
-  const prompt = numericPrompt()
-  assert.ok(prompt, `nothing answerable on screen:\n${document.body.textContent}`)
-  type(String(solve(prompt)))
-  fireEvent.keyDown(window, { key: 'Enter' })
-}
-
-/** Answer the current problem wrongly, whichever input mode it uses. */
-function answerWrongly(): void {
-  const compare = comparePrompt()
-  if (compare) {
-    const [, a, b] = compare.match(/^(\d+) \? (\d+)$/)!
-    fireEvent.click(screen.getByRole('button', { name: +a > +b ? '<' : '>' }))
-    return
-  }
-  const prompt = numericPrompt()
-  assert.ok(prompt, `nothing answerable on screen:\n${document.body.textContent}`)
-  type(String(solve(prompt) + 1))
-  fireEvent.keyDown(window, { key: 'Enter' })
 }
 
 const settle = () => act(async () => { await new Promise((r) => setTimeout(r, 900)) })
