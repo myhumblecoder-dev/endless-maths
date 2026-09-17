@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Keypad } from './Keypad'
 import { Maths } from './Maths'
-import { answer as submitAnswer, completesProblem, currentProblem, isComplete, startSession, summary, type Session } from '@/lib/session/session'
+import { answer as submitAnswer, completesProblem, currentProblem, goalOfSession, isComplete, startSession, summary, type Session } from '@/lib/session/session'
+import { adaptDifficulty, levelNews, type LevelChange } from '@/lib/session/adapt'
 import { canSubmit as entryCanSubmit, choiceForKey, isEntryKey, press } from '@/lib/session/keypad'
 import type { Verdict } from '@/lib/curriculum/types'
 import { feedbackText, formatAnswer } from '@/lib/problems/format'
@@ -62,6 +63,8 @@ export function Practice({
   const [session, setSession] = useState<Session | null>(null)
   const [entry, setEntry] = useState('')
   const [feedback, setFeedback] = useState<Feedback | null>(null)
+  /** Set once, when a session ends and the level moves. Told, never silent. */
+  const [levelChange, setLevelChange] = useState<LevelChange | null>(null)
   const shownAt = useRef<number>(0)
   /** The session as it will be once the current feedback finishes. */
   const pending = useRef<Session | null>(null)
@@ -100,6 +103,7 @@ export function Practice({
     setSession(startSession(latestProgress.current, seeded(seed ?? Date.now()), { skill, now: Date.now() }))
     setEntry('')
     setFeedback(null)
+    setLevelChange(null)
     shownAt.current = Date.now()
   }, [skill, seed])
 
@@ -131,11 +135,25 @@ export function Practice({
       return
     }
 
-    onProgress(next.progress)
-    pending.current = next
+    /**
+     * The end of a session is when the level for this topic moves — down if
+     * they ran out of questions, up if they never needed an extra one. Applied
+     * here, on the answer that finishes it, because this is the only moment
+     * that knows both the outcome and the topic it belonged to.
+     */
+    const adapted = isComplete(next)
+      ? adaptDifficulty(next.progress, skill, goalOfSession(next), next.attempts.length, next.minimum)
+      : null
+    const saved = adapted?.progress ?? next.progress
+
+    onProgress(saved)
+    if (adapted?.change) setLevelChange(adapted.change)
+    // The session carries the same progress that was persisted, so the gap
+    // suggestion below is reading the state the learner actually has.
+    pending.current = adapted ? { ...next, progress: saved } : next
     timer.current = window.setTimeout(
       advance, verdict === 'correct' ? FEEDBACK_CORRECT_MS : FEEDBACK_WRONG_MS)
-  }, [session, feedback, onProgress, advance])
+  }, [session, feedback, onProgress, advance, skill])
 
   const onKey = useCallback((key: string) => {
     if (feedback || !problem) return
@@ -220,6 +238,14 @@ export function Practice({
               ? "That's enough for today. We'll pick this one up again next time."
               : 'Nine out of ten. That was the goal.'}
           </p>
+          {/*
+            Being quietly given easier work is worse than being told. Said in
+            terms of what the next session will feel like, and only when the
+            level genuinely moved — see adapt.ts.
+          */}
+          {levelChange && (
+            <p className="mt-1 text-sm text-sky-700 dark:text-sky-400">{levelNews(levelChange)}</p>
+          )}
           {median !== null && (
             <p className="mt-1 text-sm text-slate-400 dark:text-slate-500">
               {(median / 1000).toFixed(1)}s per question

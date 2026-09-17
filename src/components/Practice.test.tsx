@@ -331,3 +331,26 @@ test('the device can be handed over at the end of a session', async () => {
   fireEvent.click(screen.getByRole('button', { name: /Switch to someone else/i }))
   assert.equal(onSwitch.mock.calls.length, 1)
 })
+
+/**
+ * Being quietly given easier work is worse than being told. The whole mechanism
+ * depends on the child trusting it, and a silent change is indistinguishable
+ * from the app deciding they are not up to it.
+ */
+test('running out of questions says the next lot will be gentler', async () => {
+  render(<StruggleHarness />)
+  await failEverything()
+
+  const body = document.body.textContent ?? ''
+  assert.match(body, /enough for today/i, 'the cap is stated as a stopping point, not a failure')
+  assert.match(body, /gentler/i, 'and the child is told what changes because of it')
+})
+
+test('nothing is claimed about a topic that has no easier version', async () => {
+  // Times tables have one band, so there is no gentler version to promise.
+  render(<Harness skill="m-times-6-7-8-9" />)
+  await failEverything()
+
+  assert.doesNotMatch(document.body.textContent ?? '', /gentler|harder/i,
+    'a promise the app cannot keep is worse than saying nothing')
+})

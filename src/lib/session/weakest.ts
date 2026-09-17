@@ -24,7 +24,7 @@
 import type { Difficulty } from '@/lib/curriculum/types'
 import { isVaried, type ImplementedSkill } from '@/lib/problems'
 import { isSkillMastered, skillProgress, type Progress } from '@/lib/mastery/mastery'
-import { difficultyFor } from '@/lib/mastery/levels'
+import { difficultyFor, provenAt } from '@/lib/mastery/levels'
 import { blockedBy, unlockedSkills } from './scheduler'
 
 /** What a score at each level is worth against a score at full difficulty. */
@@ -65,20 +65,23 @@ const weakestFirst = (progress: Progress) => (a: ImplementedSkill, b: Implemente
 /**
  * Done with, for now.
  *
- * Mastered is not enough on its own. A topic sitting at `simple` is there
- * because the learner hit the session cap on it and the level was dropped to
- * give them a way through — so passing it at that level clears the session, not
- * the topic. The drop is a debt to be repaid, not a new baseline, and a topic
- * still carrying one keeps coming back.
+ * Mastered is not enough on its own. A topic is dropped to `simple` because the
+ * learner ran out of questions on it, and beating the concession clears the
+ * session rather than the topic.
  *
- * Getting back to `medium` settles it. Going on to `difficult` is worth more in
- * the ordering below, but it is not a toll every topic has to pay: grinding all
- * fifty-four to the hardest band before meeting anything new would be a
- * punishment, not a curriculum.
+ * The test is what they have PROVED, not what they are queued to be asked next.
+ * Those differ by exactly one session: passing the simple version steps the
+ * level back up to medium, and reading the queued level would have counted that
+ * as having done it at medium before they had answered a single question there.
+ * That is the escape hatch this whole mechanism exists to close.
+ *
+ * A topic with no `proven` entry is settled on mastery alone — placement, and
+ * every record written before levels existed, is taken at face value rather
+ * than treated as suspect.
  */
 const isSettled = (progress: Progress, skill: ImplementedSkill): boolean =>
   isSkillMastered(progress, skill)
-  && (!isVaried(skill) || difficultyFor(progress, skill) !== 'simple')
+  && (!isVaried(skill) || provenAt(progress, skill) !== 'simple')
 
 /**
  * The topic to practise now.

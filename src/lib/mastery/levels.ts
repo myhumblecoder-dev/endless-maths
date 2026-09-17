@@ -36,6 +36,26 @@ export function setDifficulty(progress: Progress, skill: SkillId, level: Difficu
   return { ...progress, levels: { ...progress.levels, [skill]: level } }
 }
 
+/**
+ * The level this topic was last beaten at, if it has been.
+ *
+ * Deliberately separate from the level it will be ASKED at next. Passing the
+ * simple version steps the level back up to medium, but what they have proved
+ * is still only the simple version — and conflating the two let a child clear a
+ * topic for good by failing it once and then beating the concession.
+ */
+export function provenAt(progress: Progress, skill: SkillId): Difficulty | undefined {
+  const stored = progress.proven?.[skill]
+  return known(stored) ? stored : undefined
+}
+
+/** Records what they have just shown they can do. */
+export function recordPass(progress: Progress, skill: SkillId, level: Difficulty): Progress {
+  if (!isVaried(skill)) return progress
+  if (provenAt(progress, skill) === level) return progress
+  return { ...progress, proven: { ...progress.proven, [skill]: level } }
+}
+
 /** After hitting the question cap: give them a way through the same topic. */
 export const easeOff = (progress: Progress, skill: SkillId): Progress =>
   setDifficulty(progress, skill, easier(difficultyFor(progress, skill)))

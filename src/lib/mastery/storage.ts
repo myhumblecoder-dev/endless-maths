@@ -36,10 +36,12 @@ const normalise = (p: Progress): Progress => ({
   // existed stays without the key. Each value is validated on read, in
   // mastery/levels.ts, so a hand-edited or half-migrated record cannot hand a
   // generator a level it does not understand.
-  ...(typeof p.levels === 'object' && p.levels !== null && !Array.isArray(p.levels)
-    ? { levels: p.levels }
-    : {}),
+  ...(plainObject(p.levels) ? { levels: p.levels } : {}),
+  ...(plainObject(p.proven) ? { proven: p.proven } : {}),
 })
+
+const plainObject = (x: unknown): boolean =>
+  typeof x === 'object' && x !== null && !Array.isArray(x)
 
 /**
  * Never throws. A mangled record costs the child their history, which is
