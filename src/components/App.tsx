@@ -11,12 +11,17 @@ import {
   addProfile, adoptLegacyRecord, loadProfiles, progressKeyFor, removeProfile, saveProfiles,
   type ProfileState, type ProfileStore,
 } from '@/lib/mastery/profiles'
+import { pickTopic, type Pick } from '@/lib/session/weakest'
 import type { Progress } from '@/lib/mastery/mastery'
 import type { ImplementedSkill } from '@/lib/problems'
 
 /**
  * Four screens: pick who is practising, sit the level check once, see what it
- * decided, then choose a topic and practise.
+ * decided, then practise — on the topic the app chose.
+ *
+ * The child does not pick the topic. Given a list, a learner picks what they
+ * are already good at, which is the one thing practice cannot improve. The
+ * topic map is still there, as somewhere to see how it is going.
  *
  * Progress is read from and written to localStorage only, under a key per
  * profile — the store is per-browser rather than per-person, so a single key
@@ -62,10 +67,39 @@ const progressStoreFor = (profileId: string): KeyValueStore => {
   }
 }
 
-export function App() {
+export function App({ seed }: {
+  /**
+   * Fix the session seed. Omitted in the app, where the clock supplies it.
+   *
+   * Set by tests so a session is the same set of questions every run — without
+   * it, whether an interleaved question happens to be one that is TAPPED rather
+   * than typed varies per run, and a test that answers by typing passes locally
+   * and fails in CI. It is also the hook a "replay this session" feature would
+   * use; see Practice.
+   */
+  seed?: number
+} = {}) {
   const [profiles, setProfiles] = useState<ProfileState | null>(null)
   const [progress, setProgress] = useState<Progress | null>(null)
-  const [skill, setSkill] = useState<ImplementedSkill | null>(null)
+  /**
+   * The topic in hand, FROZEN for the length of the session.
+   *
+   * Deliberately state rather than `pickTopic(progress)` at render time.
+   * Answering a question changes progress, which would change the pick, which
+   * would restart the session from question one — the same shape of bug that
+   * once pinned the counter at 1 / 20.
+   */
+  const [topic, setTopic] = useState<Pick | null>(null)
+  /**
+   * Which run of practice this is.
+   *
+   * Only used as Practice's `key`, and that is the whole point: "Keep going"
+   * re-picks the topic, and a topic stays weakest until it is beaten — so the
+   * common case is picking the SAME skill, which changed no prop Practice
+   * watches. The session stayed finished and the button did nothing at all.
+   */
+  const [run, setRun] = useState(0)
+  const [showingProgress, setShowingProgress] = useState(false)
   const [showingResult, setShowingResult] = useState(false)
   /** Stamped when the map is shown, not read during render. */
   const [now, setNow] = useState(0)
@@ -84,8 +118,19 @@ export function App() {
   /* eslint-disable react-hooks/set-state-in-effect --
      Whose journey to load is only known once a profile is chosen. */
   useEffect(() => {
-    setProgress(activeId ? loadProgress(progressStoreFor(activeId)) : null)
-    setSkill(null)
+    const loaded = activeId ? loadProgress(progressStoreFor(activeId)) : null
+    setProgress(loaded)
+    /**
+     * Pick the topic HERE, with the journey, not at render time.
+     *
+     * Leaving it null and falling back to `pickTopic(progress)` in the render
+     * meant it was recomputed on every answer — and answering changes what is
+     * weakest, so the topic could change out from under a session in progress.
+     * On a fresh launch, which is every launch, it swapped topic after one
+     * question and restarted the count.
+     */
+    setTopic(loaded?.placementDone ? pickTopic(loaded) : null)
+    setShowingProgress(false)
     setShowingResult(false)
   }, [activeId])
   /* eslint-enable react-hooks/set-state-in-effect */
@@ -100,6 +145,20 @@ export function App() {
     saveProfiles(browserProfileStore(), next)
     setProfiles(next)
   }, [])
+
+  /** Begin a run of practice on this topic. */
+  const startRun = useCallback((next: Pick) => {
+    setTopic(next)
+    setRun((n) => n + 1)
+    setShowingProgress(false)
+    setNow(Date.now())
+  }, [])
+
+  /** Start the next session on whatever is weakest NOW, not when they sat down. */
+  const nextTopic = useCallback(
+    (from: Progress) => startRun(pickTopic(from)),
+    [startRun],
+  )
 
   if (!profiles) {
     return <main className="grid min-h-dvh place-items-center text-slate-400">Loading…</main>
@@ -151,7 +210,7 @@ export function App() {
     return (
       <PlacementResult
         progress={progress}
-        onContinue={() => { setNow(Date.now()); setShowingResult(false) }}
+        onContinue={() => { setShowingResult(false); nextTopic(progress) }}
         onRetake={() => {
           setShowingResult(false)
           persist({ ...progress, placed: [], placementDone: false })
@@ -160,27 +219,50 @@ export function App() {
     )
   }
 
-  if (skill) {
+  if (showingProgress) {
+    /**
+     * Picked ONCE, and used for both the name and the button.
+     *
+     * Showing the frozen topic from before the session while the button
+     * re-picked from the progress after it meant the map could say "Rounding"
+     * and then start something else — being moved around without being told
+     * why, which is the thing this callout exists to prevent.
+     */
+    const upNext = pickTopic(progress)
     return (
-      <Practice
-        skill={skill}
+      <SkillMap
         progress={progress}
-        onProgress={persist}
-        onLeave={() => { setNow(Date.now()); setSkill(null) }}
-        onPickSkill={setSkill}
+        upNext={upNext}
+        onBack={() => startRun(upNext)}
+        onRetakePlacement={() => persist({ ...progress, placed: [], placementDone: false })}
+        onSessionLength={(sessionLength) => persist({ ...progress, sessionLength })}
+        onSwitchProfile={() => persistProfiles({ ...profiles, activeId: null })}
+        profileName={profiles.profiles.find((p) => p.id === activeId)?.name}
+        now={now}
       />
     )
   }
 
+  // Set alongside the journey it was chosen from, so this is only ever the one
+  // frame between mount and that effect running.
+  if (!topic) {
+    return <main className="grid min-h-dvh place-items-center text-slate-400">Loading…</main>
+  }
+
   return (
-    <SkillMap
+    <Practice
+      // A new run is a new session, even when it is the same topic.
+      key={run}
+      seed={seed}
+      skill={topic.skill}
+      reason={topic.reason}
       progress={progress}
-      onPick={setSkill}
-      onRetakePlacement={() => persist({ ...progress, placed: [], placementDone: false })}
-      onSessionLength={(sessionLength) => persist({ ...progress, sessionLength })}
-      onSwitchProfile={() => persistProfiles({ ...profiles, activeId: null })}
+      onProgress={persist}
+      onNext={() => nextTopic(progress)}
+      onLeave={() => { setNow(Date.now()); setShowingProgress(true) }}
+      onPickSkill={(skill: ImplementedSkill) => startRun({ skill, reason: 'foundation' })}
       profileName={profiles.profiles.find((p) => p.id === activeId)?.name}
-      now={now}
+      onSwitchProfile={() => persistProfiles({ ...profiles, activeId: null })}
     />
   )
 }

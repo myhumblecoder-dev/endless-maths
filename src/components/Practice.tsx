@@ -10,6 +10,7 @@ import { feedbackText, formatAnswer } from '@/lib/problems/format'
 import { seeded } from '@/lib/problems'
 import { SKILL_BY_ID } from '@/lib/curriculum/skills'
 import { gapBehind } from '@/lib/session/diagnose'
+import { topicIsA, type PickReason } from '@/lib/session/weakest'
 import type { Progress } from '@/lib/mastery/mastery'
 import type { ImplementedSkill } from '@/lib/problems'
 
@@ -25,11 +26,26 @@ type Feedback = { verdict: Verdict; expected: string }
 
 type Props = {
   skill: ImplementedSkill
+  /** Why this topic. The app chose it; being told why is the difference
+   *  between being guided and being pushed around. */
+  reason?: PickReason
   progress: Progress
   onProgress: (progress: Progress) => void
+  /** Move on to whatever is weakest now — which may well be this again. */
+  onNext?: () => void
   onLeave: () => void
   /** Jump straight to another skill — used by the gap suggestion. */
   onPickSkill?: (skill: ImplementedSkill) => void
+  /**
+   * Whose session this is, and how to hand the device over.
+   *
+   * On screen because the app now opens straight into a session: a sibling
+   * picking the device up lands mid-someone-else's topic, and if they answer
+   * first it goes into the wrong journey — the exact mixing profiles exist to
+   * stop. Seeing the name is what prevents it.
+   */
+  profileName?: string
+  onSwitchProfile?: () => void
   /**
    * Fix the session seed. Omitted in the app (the clock supplies it), set in
    * tests — and the hook a "replay this session" feature would use, since the
@@ -38,7 +54,10 @@ type Props = {
   seed?: number
 }
 
-export function Practice({ skill, progress, onProgress, onLeave, onPickSkill, seed }: Props) {
+export function Practice({
+  skill, reason, progress, onProgress, onNext, onLeave, onPickSkill,
+  profileName, onSwitchProfile, seed,
+}: Props) {
   // Session seeding uses the clock, so the first render must be server-safe.
   const [session, setSession] = useState<Session | null>(null)
   const [entry, setEntry] = useState('')
@@ -224,13 +243,18 @@ export function Practice({ skill, progress, onProgress, onLeave, onPickSkill, se
           )}
 
           <div className="mt-8 space-y-3">
+            {/*
+              "Keep going", not "Again": what comes next is the app's call, and
+              it may well be this same topic. Saying "Again" would promise a
+              repeat and then sometimes hand them something else.
+            */}
             <button
               type="button"
-              onClick={begin}
+              onClick={onNext ?? begin}
               className="h-14 w-full rounded-2xl bg-emerald-600 text-lg font-semibold text-white
                          transition active:scale-95 hover:bg-emerald-700"
             >
-              Again
+              Keep going
             </button>
             <button
               type="button"
@@ -238,8 +262,19 @@ export function Practice({ skill, progress, onProgress, onLeave, onPickSkill, se
               className="h-14 w-full rounded-2xl text-lg font-semibold text-slate-500
                          transition hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
             >
-              Choose another topic
+              See how I&apos;m doing
             </button>
+            {/* The end of a session is when the device actually changes hands. */}
+            {onSwitchProfile && (
+              <button
+                type="button"
+                onClick={onSwitchProfile}
+                className="h-12 w-full rounded-2xl text-base font-semibold text-slate-400
+                           transition hover:bg-slate-100 dark:text-slate-500 dark:hover:bg-slate-800"
+              >
+                Switch to someone else
+              </button>
+            )}
           </div>
         </div>
       </main>
@@ -256,8 +291,8 @@ export function Practice({ skill, progress, onProgress, onLeave, onPickSkill, se
           <button
             type="button"
             onClick={onLeave}
-            className="-ml-1 rounded px-1 hover:text-slate-900 dark:hover:text-slate-100"
-            aria-label="Back to the topic list"
+            className="-ml-1 truncate rounded px-1 hover:text-slate-900 dark:hover:text-slate-100"
+            aria-label="See how I'm doing"
           >
             ← {label}
           </button>
@@ -267,7 +302,11 @@ export function Practice({ skill, progress, onProgress, onLeave, onPickSkill, se
             as a broken app — and the child would have no idea what to do about
             it. Getting them right is what brings this number down.
           */}
-          <span className="tabular-nums">{stats.answered + 1} / {stats.total}</span>
+          <span className="shrink-0 tabular-nums">
+            {/* A separator, or "Adding two-digit numbers Eddie" reads as one phrase. */}
+            {profileName && <span className="text-slate-400 dark:text-slate-500">{profileName} · </span>}
+            {stats.answered + 1} / {stats.total}
+          </span>
         </div>
 
         {/*
@@ -277,7 +316,9 @@ export function Practice({ skill, progress, onProgress, onLeave, onPickSkill, se
           the one they chose.
         */}
         <p className="mt-2 h-5 text-xs text-slate-400 dark:text-slate-500">
-          {problem.skill !== skill && `Review · ${SKILL_BY_ID.get(problem.skill)?.label ?? ''}`}
+          {problem.skill !== skill
+            ? `Review · ${SKILL_BY_ID.get(problem.skill)?.label ?? ''}`
+            : reason && topicIsA(reason)}
         </p>
         {/*
           Only once they are past the minimum and the session is still going.

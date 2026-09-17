@@ -5,6 +5,7 @@ import { useState } from 'react'
 import { render, screen, fireEvent, cleanup, act } from '@testing-library/react'
 import { Practice } from './Practice'
 import { SESSION_CAP } from '@/lib/session/goal'
+import { answerCorrectly, answerWrongly, comparePrompt, numericPrompt } from './testing/answering'
 import { emptyProgress, record, type Progress } from '@/lib/mastery/mastery'
 import type { ImplementedSkill } from '@/lib/problems'
 
@@ -17,71 +18,33 @@ afterEach(cleanup)
  *
  * The seed is fixed so a session is identical on every run.
  */
-function Harness({ skill = 'a-add-within-10' as ImplementedSkill, seed = 4242 }) {
+function Harness({
+  skill = 'a-add-within-10' as ImplementedSkill,
+  seed = 4242,
+  profileName,
+  onSwitchProfile,
+}: {
+  skill?: ImplementedSkill
+  seed?: number
+  profileName?: string
+  onSwitchProfile?: () => void
+}) {
   const [progress, setProgress] = useState<Progress>(() => ({
     ...emptyProgress(),
     placed: ['n-bonds-10', 'a-add-within-10', 'a-sub-within-10', 'a-add-within-20'],
     placementDone: true,
   }))
   return (
-    <Practice skill={skill} progress={progress} onProgress={setProgress} onLeave={() => {}} seed={seed} />
+    <Practice
+      skill={skill}
+      progress={progress}
+      onProgress={setProgress}
+      onLeave={() => {}}
+      profileName={profileName}
+      onSwitchProfile={onSwitchProfile}
+      seed={seed}
+    />
   )
-}
-
-// ---- reading and answering whatever is on screen --------------------------
-// Sessions interleave, so a session anchored on one skill still shows others.
-// These helpers cope with both input modes: the numeric keypad, and the three
-// buttons the comparison skill uses.
-
-const paragraphs = () => [...document.querySelectorAll('p')].map((p) => (p.textContent ?? '').trim())
-
-/** The comparison prompt, when that is what is on screen. */
-const comparePrompt = () => paragraphs().find((t) => /^\d+ \? \d+$/.test(t))
-
-const numericPrompt = () => paragraphs().find((t) =>
-  /^\d+\s*[+−]\s*\d+$/.test(t) ||
-  /^\d+ \+ \? = 10$/.test(t) ||
-  /^Which digit is in the \w+ place\?/.test(t))
-
-function solve(prompt: string): number {
-  let m
-  if ((m = prompt.match(/^(\d+)\s*([+−])\s*(\d+)$/))) return m[2] === '+' ? +m[1] + +m[3] : +m[1] - +m[3]
-  if ((m = prompt.match(/^(\d+) \+ \? = 10$/))) return 10 - +m[1]
-  if ((m = prompt.match(/^Which digit is in the (\w+) place\?\s+(\d+)$/))) {
-    const n = m[2]
-    return +(m[1] === 'ones' ? n.slice(-1) : m[1] === 'tens' ? n.slice(-2, -1) : n.slice(-3, -2))
-  }
-  assert.fail(`cannot solve "${prompt}"`)
-}
-
-const type = (text: string) => { for (const ch of text) fireEvent.keyDown(window, { key: ch }) }
-
-/** Answer the current problem correctly, whichever input mode it uses. */
-function answerCorrectly(): void {
-  const compare = comparePrompt()
-  if (compare) {
-    const [, a, b] = compare.match(/^(\d+) \? (\d+)$/)!
-    fireEvent.click(screen.getByRole('button', { name: +a > +b ? '>' : +a < +b ? '<' : '=' }))
-    return
-  }
-  const prompt = numericPrompt()
-  assert.ok(prompt, `nothing answerable on screen:\n${document.body.textContent}`)
-  type(String(solve(prompt)))
-  fireEvent.keyDown(window, { key: 'Enter' })
-}
-
-/** Answer the current problem wrongly, whichever input mode it uses. */
-function answerWrongly(): void {
-  const compare = comparePrompt()
-  if (compare) {
-    const [, a, b] = compare.match(/^(\d+) \? (\d+)$/)!
-    fireEvent.click(screen.getByRole('button', { name: +a > +b ? '<' : '>' }))
-    return
-  }
-  const prompt = numericPrompt()
-  assert.ok(prompt, `nothing answerable on screen:\n${document.body.textContent}`)
-  type(String(solve(prompt) + 1))
-  fireEvent.keyDown(window, { key: 'Enter' })
 }
 
 const settle = () => act(async () => { await new Promise((r) => setTimeout(r, 900)) })
@@ -172,8 +135,8 @@ test('the whole session can be played to the summary screen', { timeout: 60_000 
 
   // Answered correctly throughout, so the score is a clean sweep.
   assert.match(document.body.textContent ?? '', /20\s*\/\s*20/)
-  expect(screen.getByRole('button', { name: /^Again$/ })).toBeTruthy()
-  expect(screen.getByRole('button', { name: /Choose another topic/ })).toBeTruthy()
+  expect(screen.getByRole('button', { name: /^Keep going$/ })).toBeTruthy()
+  expect(screen.getByRole('button', { name: /See how/ })).toBeTruthy()
 })
 
 /** Interleaving: a session anchored on one skill should still show others. */
@@ -234,7 +197,7 @@ async function failEverything() {
   vi.useFakeTimers()
   try {
     for (let i = 0; i < SESSION_CAP; i++) {
-      if (screen.queryByRole('button', { name: /^Again$/ })) break // already finished
+      if (screen.queryByRole('button', { name: /^Keep going$/ })) break // already finished
       if (screen.queryByRole('button', { name: 'Submit' })) {
         fireEvent.keyDown(window, { key: '0' })
         fireEvent.keyDown(window, { key: 'Enter' })
@@ -266,7 +229,7 @@ test('the suggestion can be declined', { timeout: 30_000 }, async () => {
   await failEverything()
 
   assert.equal(picked.length, 0, 'nothing should be forced on them')
-  expect(screen.getByRole('button', { name: /^Again$/ })).toBeTruthy()
+  expect(screen.getByRole('button', { name: /^Keep going$/ })).toBeTruthy()
 })
 
 // ---- making the mix legible ----------------------------------------------
@@ -345,6 +308,26 @@ test('the back link and Submit are reachable as real buttons', () => {
   render(<Harness />)
   // Native buttons are focusable and Enter-activatable; anything else would
   // need explicit key handling to be usable without a mouse.
-  const back = screen.getByRole('button', { name: /Back to the topic list|←/ })
+  const back = screen.getByRole('button', { name: /See how|←/ })
   assert.equal(back.tagName, 'BUTTON')
+})
+
+/**
+ * The app opens straight into a session now, so a sibling picking the device up
+ * lands mid-someone-else's topic. If they answer before noticing, it goes into
+ * the wrong journey — the exact mixing profiles exist to stop.
+ */
+test('whose session it is is on screen from the first question', () => {
+  render(<Harness skill="a-add-within-20" profileName="Eddie" onSwitchProfile={() => {}} />)
+  assert.match(document.body.textContent ?? '', /Eddie/,
+    'a sibling must be able to see whose journey they are about to practise into')
+})
+
+test('the device can be handed over at the end of a session', async () => {
+  const onSwitch = vi.fn()
+  render(<Harness skill="a-add-within-20" profileName="Eddie" onSwitchProfile={onSwitch} />)
+  await failEverything()
+
+  fireEvent.click(screen.getByRole('button', { name: /Switch to someone else/i }))
+  assert.equal(onSwitch.mock.calls.length, 1)
 })
