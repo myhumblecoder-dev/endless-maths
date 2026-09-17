@@ -11,6 +11,9 @@ afterEach(() => { cleanup(); localStorage.clear() })
 
 const settle = () => act(async () => { await new Promise((r) => setTimeout(r, 50)) })
 
+/** Fixed, so a session is the same questions every run. See App's `seed`. */
+const SEED = 20260917
+
 /** Work through the level check by skipping every question. */
 async function sitTheQuiz(): Promise<void> {
   for (let i = 0; i < 40; i++) {
@@ -205,8 +208,22 @@ test('the active profile is remembered on the next visit', async () => {
  * as the session that used to restart on every answer.
  */
 test('the topic stays put while a session is being answered', async () => {
-  seedJourney()
-  render(<App />)
+  /**
+   * Two wrong answers away from mastering the topic, so ONE right answer on it
+   * settles it and the weakest genuinely moves elsewhere. That is the only
+   * state in which this bug shows: it was the re-pick changing that swapped the
+   * questions, so a topic that stays weakest hides it completely.
+   */
+  seedJourney({
+    skills: {
+      'a-add-3digit': {
+        skill: 'a-add-3digit', attempts: 8,
+        recent: [false, false, true, true, true, true, true, true, true, true],
+        lastSeenAt: 0,
+      },
+    },
+  })
+  render(<App seed={SEED} />)
   await settle()
   await atPractice()
 
@@ -214,16 +231,32 @@ test('the topic stays put while a session is being answered', async () => {
   assert.ok(topicAtStart, 'a session should be under way')
 
   for (let i = 0; i < 4; i++) {
-    fireEvent.keyDown(window, { key: '0' })
-    fireEvent.keyDown(window, { key: 'Enter' })
+    await clearFeedback()
+    answerCorrectly()
     await act(async () => {})
   }
+  // The counter only moves once the last answer's feedback has gone.
+  await clearFeedback()
 
   assert.equal(topicOnScreen(), topicAtStart,
     'answering must not hand them a different topic half way through')
-  assert.doesNotMatch(document.body.textContent ?? '', /·\s*1 \/ 20/,
-    'nor start the count again')
+  assert.equal(counterOnScreen(), 5, 'nor start the count again')
 })
+
+/**
+ * Which question they are on.
+ *
+ * Asserting the counter is not back at 1 was not enough: the loop used to press
+ * keys at every question, and a comparison question is TAPPED, so four presses
+ * at one answered nothing and left the counter legitimately at 1. The test then
+ * failed for a reason that had nothing to do with what it was testing. Reading
+ * the number says what actually happened.
+ */
+function counterOnScreen(): number {
+  const m = (document.body.textContent ?? '').match(/(\d+) \/ \d+/)
+  assert.ok(m, 'no question counter on screen')
+  return Number(m[1])
+}
 
 /** The label in the back link, which names the topic in hand. */
 const topicOnScreen = () =>
@@ -265,7 +298,7 @@ test('keep going starts a new session even on the same topic', { timeout: 60_000
   // Well enough behind that one short session cannot rescue the topic, so it is
   // still the weakest afterwards. That is the case the button was broken in.
   seedJourney({ sessionLength: 10 })
-  render(<App />)
+  render(<App seed={SEED} />)
   await settle()
   await atPractice()
 

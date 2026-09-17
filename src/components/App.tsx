@@ -67,7 +67,18 @@ const progressStoreFor = (profileId: string): KeyValueStore => {
   }
 }
 
-export function App() {
+export function App({ seed }: {
+  /**
+   * Fix the session seed. Omitted in the app, where the clock supplies it.
+   *
+   * Set by tests so a session is the same set of questions every run — without
+   * it, whether an interleaved question happens to be one that is TAPPED rather
+   * than typed varies per run, and a test that answers by typing passes locally
+   * and fails in CI. It is also the hook a "replay this session" feature would
+   * use; see Practice.
+   */
+  seed?: number
+} = {}) {
   const [profiles, setProfiles] = useState<ProfileState | null>(null)
   const [progress, setProgress] = useState<Progress | null>(null)
   /**
@@ -242,6 +253,7 @@ export function App() {
     <Practice
       // A new run is a new session, even when it is the same topic.
       key={run}
+      seed={seed}
       skill={topic.skill}
       reason={topic.reason}
       progress={progress}
