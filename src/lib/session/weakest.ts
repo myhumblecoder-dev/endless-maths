@@ -25,7 +25,7 @@ import type { Difficulty } from '@/lib/curriculum/types'
 import { isVaried, type ImplementedSkill } from '@/lib/problems'
 import { isSkillMastered, skillProgress, type Progress } from '@/lib/mastery/mastery'
 import { difficultyFor, provenAt } from '@/lib/mastery/levels'
-import { blockedBy, unlockedSkills } from './scheduler'
+import { unlockedSkills } from './scheduler'
 
 /** What a score at each level is worth against a score at full difficulty. */
 const LEVEL_WORTH: Record<Difficulty, number> = { simple: 0.6, medium: 0.8, difficult: 1 }
@@ -37,7 +37,14 @@ export type PickReason =
   | 'climbing'
   /** Unlocked and never met. */
   | 'new'
-  /** Something underneath has rotted; drilling the top would not help. */
+  /**
+   * Sent to what something else stands on. Not produced by `pickTopic`:
+   * `unlockedSkills` already refuses any skill whose prerequisites are not
+   * mastered, so nothing it offers can be standing on a gap. A prerequisite
+   * that rots simply becomes the weakest practised topic and is picked as
+   * `struggling`. This is for the end-of-session suggestion, which is offered
+   * rather than chosen — see diagnose.ts.
+   */
   | 'foundation'
   /** Nothing is failing, so take the least-proven one further. */
   | 'polish'
@@ -52,7 +59,17 @@ export type Pick = { skill: ImplementedSkill; reason: PickReason }
  * same claim demonstrated.
  */
 export function strengthOf(progress: Progress, skill: ImplementedSkill): number {
-  const worth = isVaried(skill) ? LEVEL_WORTH[difficultyFor(progress, skill)] : 1
+  /**
+   * The level they were PROVED at where there is one, falling back to the level
+   * queued next where there is not.
+   *
+   * Using the queued level alone made a topic jump from 0.6x to 0.8x the moment
+   * a simple pass stepped it up to medium — crediting a level before a single
+   * question had been answered there, which is the same before-the-evidence
+   * accounting `isSettled` reads `provenAt` to avoid.
+   */
+  const level = provenAt(progress, skill) ?? difficultyFor(progress, skill)
+  const worth = isVaried(skill) ? LEVEL_WORTH[level] : 1
   const seen = skillProgress(progress, skill)
   const accuracy = seen ? seen.accuracy : isSkillMastered(progress, skill) ? 1 : 0
   return worth * accuracy
@@ -110,11 +127,10 @@ export function pickTopic(progress: Progress): Pick {
     .filter((id) => !isSettled(progress, id))
     .sort(weakestFirst(progress))[0]
   if (unfinished) {
-    return foundationOr(
-      progress,
-      unfinished,
-      isSkillMastered(progress, unfinished) ? 'climbing' : 'struggling',
-    )
+    return {
+      skill: unfinished,
+      reason: isSkillMastered(progress, unfinished) ? 'climbing' : 'struggling',
+    }
   }
 
   /**
@@ -125,24 +141,9 @@ export function pickTopic(progress: Progress): Pick {
   const fresh = unlocked.find(
     (id) => skillProgress(progress, id) === undefined && !isSkillMastered(progress, id),
   )
-  if (fresh) return foundationOr(progress, fresh, 'new')
+  if (fresh) return { skill: fresh, reason: 'new' }
 
-  return foundationOr(progress, [...unlocked].sort(weakestFirst(progress))[0], 'polish')
-}
-
-/**
- * Send them to what this stands on, if that has rotted underneath it.
- *
- * Practice can overturn a placement, so a prerequisite can regress after the
- * thing above it was unlocked. Drilling the top of a stack whose bottom has
- * gone is the one choice guaranteed not to help — and `blockedBy` gives the
- * immediate prerequisite rather than the deepest one, so they are sent one step
- * down rather than all the way to the beginning.
- */
-function foundationOr(progress: Progress, skill: ImplementedSkill, reason: PickReason): Pick {
-  const missing = blockedBy(progress, skill)
-  if (missing.length === 0) return { skill, reason }
-  return { skill: [...missing].sort(weakestFirst(progress))[0], reason: 'foundation' }
+  return { skill: [...unlocked].sort(weakestFirst(progress))[0], reason: 'polish' }
 }
 
 /** For naming the topic to the learner without repeating the pick logic. */

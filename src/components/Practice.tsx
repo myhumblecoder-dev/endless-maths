@@ -142,7 +142,7 @@ export function Practice({
      * that knows both the outcome and the topic it belonged to.
      */
     const adapted = isComplete(next)
-      ? adaptDifficulty(next.progress, skill, goalOfSession(next), next.attempts.length, next.minimum)
+      ? adaptDifficulty(next.progress, skill, goalOfSession(next), next.attempts, next.minimum)
       : null
     const saved = adapted?.progress ?? next.progress
 

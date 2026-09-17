@@ -21,10 +21,10 @@
  * once and be quietly given something easier for ever.
  */
 
-import type { Difficulty, SkillId } from '@/lib/curriculum/types'
+import type { Attempt, Difficulty, SkillId } from '@/lib/curriculum/types'
 import { difficultyFor, easeOff, recordPass, stepUp } from '@/lib/mastery/levels'
 import type { Progress } from '@/lib/mastery/mastery'
-import type { Goal } from './goal'
+import { ACCURACY, type Goal } from './goal'
 
 export type LevelChange = {
   skill: SkillId
@@ -51,16 +51,29 @@ export function adaptDifficulty(
   progress: Progress,
   skill: SkillId,
   goal: Goal,
-  answered: number,
+  attempts: readonly Attempt[],
   minimum: number,
 ): Adaptation {
   // The level moves at the end of a session, not during one.
   if (!goal.over) return { progress, change: null }
 
+  /**
+   * Judged on THIS topic's answers, not the session's.
+   *
+   * Only about half a session is the topic in hand; the rest is interleaved
+   * review and stretch. Scoring the move on all of it meant a child shaky at
+   * three-digit addition but fluent at the review facts could clear 90% and be
+   * pushed up on the very topic they were struggling with — and the reverse,
+   * dropped on a topic they were fine at because the stretch went badly.
+   */
+  const own = attempts.filter((a) => a.skill === skill)
+  const rate = own.length === 0 ? undefined : own.filter((a) => a.verdict === 'correct').length / own.length
+  const heldUp = rate !== undefined && rate >= ACCURACY
+
   const from = difficultyFor(progress, skill)
   // What they have shown they can do, which the picker reads separately from
   // what they will be asked next.
-  const after = goal.done ? recordPass(progress, skill, from) : progress
+  const after = goal.done && heldUp ? recordPass(progress, skill, from) : progress
 
   /**
    * "Clean" means the goal was met without buying a single extra question.
@@ -71,9 +84,10 @@ export function adaptDifficulty(
    * stuck on the gentle version for ever — which is the trap this was supposed
    * to be the opposite of.
    */
-  const next = goal.reachedCap
+  const answered = attempts.length
+  const next = goal.reachedCap && rate !== undefined && !heldUp
     ? easeOff(after, skill)
-    : goal.done && (answered <= minimum || from === 'simple')
+    : goal.done && heldUp && (answered <= minimum || from === 'simple')
       ? stepUp(after, skill)
       : after
 

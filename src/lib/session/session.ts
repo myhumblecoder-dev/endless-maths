@@ -9,6 +9,7 @@ import type { Attempt, Problem, Rng, Verdict } from '@/lib/curriculum/types'
 import { GENERATORS, generate, type ImplementedSkill } from '@/lib/problems'
 import { check } from '@/lib/problems/check'
 import { record, type Progress } from '@/lib/mastery/mastery'
+import { difficultyFor } from '@/lib/mastery/levels'
 import { nextSkill, unlockedSkills, weakestDueFirst } from './scheduler'
 import { DEFAULT_SESSION_LENGTH, sessionLengthOf } from './length'
 import { goalOf, type Goal } from './goal'
@@ -268,14 +269,25 @@ export function startSession(progress: Progress, rng: Rng, options: SessionOptio
      * asked for one. A bounded number of attempts, then settle for any problem
      * from the right skill, which is still useful review.
      */
+    /**
+     * Every topic is asked at ITS OWN level, review and stretch included.
+     *
+     * This is the wire the whole difficulty mechanism hangs from, and it was
+     * missing: the stored level reached the picker and the announcement but
+     * never a generator, so a child told "next time these will start a bit
+     * gentler" was handed the identical questions. See adapt.ts — a promise the
+     * app does not keep is the one thing that makes it untrustworthy.
+     */
+    const ask = (of: ImplementedSkill) => generate(of, rng, difficultyFor(progress, of))
+
     const drawOne = () => {
-      if (!slot) return generate(nextSkill(progress, rng), rng)
-      if (!slot.factKey) return generate(slot.skill, rng)
+      if (!slot) return ask(nextSkill(progress, rng))
+      if (!slot.factKey) return ask(slot.skill)
       for (let t = 0; t < TARGET_TRIES; t++) {
-        const candidate = generate(slot.skill, rng)
+        const candidate = ask(slot.skill)
         if (candidate.factKey === slot.factKey) return candidate
       }
-      return generate(slot.skill, rng)
+      return ask(slot.skill)
     }
 
     let candidate = drawOne()
